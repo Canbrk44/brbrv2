@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../services/database_service.dart';
 import 'sms_onay_ekrani.dart';
 
 class RandevuDetayEkrani extends StatefulWidget {
   final Map<String, dynamic> berber;
   final String? musteriTelefon;
+  final String? userName;
 
-  const RandevuDetayEkrani({super.key, required this.berber, this.musteriTelefon});
+  const RandevuDetayEkrani({super.key, required this.berber, this.musteriTelefon, this.userName});
 
   @override
   _RandevuDetayEkraniState createState() => _RandevuDetayEkraniState();
@@ -15,6 +18,7 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
   DateTime seciliTarih = DateTime.now();
   String? seciliUsta;
   String? seciliSaat;
+  final DatabaseService _dbService = DatabaseService();
 
   final List<int> doluGunler = [3, 7, 12, 18, 22, 28];
 
@@ -51,13 +55,93 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
     {"saat": "15:00", "dolu": false},
   ];
 
+  void _randevuSureciniBaslat() async {
+    String? tlf = widget.musteriTelefon;
+    String? isim = widget.userName;
+
+    if (tlf == null || isim == null) {
+      // Misafir kullanıcıdan bilgi iste
+      _misafirBilgiPopup((yeniIsim, yeniTlf) async {
+        _devamEt(yeniTlf, yeniIsim);
+      });
+    } else {
+      _devamEt(tlf, isim);
+    }
+  }
+
+  void _devamEt(String tlf, String isim) async {
+    // 1 Randevu Kuralı Kontrolü
+    bool varMi = await _dbService.aktifRandevusuVarMi(tlf);
+    if (varMi) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Zaten aktif bir randevunuz bulunuyor. Sadece 1 aktif randevu alabilirsiniz.")),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.push(
+      context, 
+      MaterialPageRoute(
+        builder: (context) => SmsOnayEkrani(
+          berberIsmi: widget.berber['isim'], 
+          ustaIsmi: seciliUsta!, 
+          tarih: "${seciliTarih.day}/${seciliTarih.month}/${seciliTarih.year}", 
+          saat: seciliSaat!,
+          musteriTelefon: tlf,
+          userName: isim,
+        )
+      )
+    );
+  }
+
+  void _misafirBilgiPopup(Function(String, String) Onay) {
+    final TextEditingController nC = TextEditingController();
+    final TextEditingController pC = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 25, right: 25, top: 25),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Randevu İçin Bilgileriniz", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            TextField(controller: nC, decoration: const InputDecoration(hintText: "Adınız Soyadınız", prefixIcon: Icon(Icons.person))),
+            const SizedBox(height: 15),
+            TextField(
+              controller: pC, 
+              keyboardType: TextInputType.phone, 
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)],
+              decoration: const InputDecoration(hintText: "Telefon Numaranız (05...)", prefixIcon: Icon(Icons.phone))
+            ),
+            const SizedBox(height: 25),
+            ElevatedButton(
+              onPressed: () {
+                if (nC.text.isNotEmpty && pC.text.length == 11 && pC.text.startsWith('0')) {
+                  Navigator.pop(context);
+                  Onay(nC.text, pC.text);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen bilgileri doğru girin.")));
+                }
+              }, 
+              child: const Text("DEVAM ET")
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.berber['isim']),
-      ),
+      appBar: AppBar(title: Text(widget.berber['isim'])),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -80,7 +164,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                 ),
               ),
             ),
-            
             const SizedBox(height: 30),
             const Text("Hizmetler ve Fiyatlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
@@ -97,7 +180,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                 )).toList(),
               ),
             ),
-
             const SizedBox(height: 30),
             const Text("Usta Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 15),
@@ -126,7 +208,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                 },
               ),
             ),
-
             const SizedBox(height: 30),
             Row(
               children: [
@@ -139,7 +220,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
             ),
             const SizedBox(height: 15),
             _ozelTakvim(colorScheme.primary),
-
             const SizedBox(height: 30),
             const Text("Saat Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 15),
@@ -164,49 +244,9 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                 );
               }).toList(),
             ),
-
-            const SizedBox(height: 30),
-            const Text("Konum", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Container(
-              height: 150,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                image: const DecorationImage(
-                  image: NetworkImage("https://images.pexels.com/photos/1470171/pexels-photo-1470171.jpeg?auto=compress&cs=tinysrgb&w=600"),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Center(child: Icon(Icons.location_on, color: colorScheme.primary, size: 40)),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Icon(Icons.map_outlined, color: colorScheme.primary, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text("Caferağa Mah. Moda Cad. No:123 Kadıköy / İstanbul", style: TextStyle(color: Colors.grey[700], fontSize: 14))),
-              ],
-            ),
-
             const SizedBox(height: 30),
             ElevatedButton(
-              onPressed: (seciliUsta != null && seciliSaat != null)
-                  ? () {
-                      Navigator.push(
-                        context, 
-                        MaterialPageRoute(
-                          builder: (context) => SmsOnayEkrani(
-                            berberIsmi: widget.berber['isim'], 
-                            ustaIsmi: seciliUsta!, 
-                            tarih: "${seciliTarih.day}/${seciliTarih.month}/${seciliTarih.year}", 
-                            saat: seciliSaat!,
-                            musteriTelefon: widget.musteriTelefon,
-                          )
-                        )
-                      );
-                    }
-                  : null,
+              onPressed: (seciliUsta != null && seciliSaat != null) ? _randevuSureciniBaslat : null,
               child: const Text("Randevuyu Onayla"),
             ),
             const SizedBox(height: 30),

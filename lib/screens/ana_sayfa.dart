@@ -7,23 +7,31 @@ class AnaSayfa extends StatefulWidget {
   final bool isGuest;
   final String? phoneNumber;
   final String? userName;
+  final int initialIndex;
 
-  const AnaSayfa({super.key, this.isGuest = false, this.phoneNumber, this.userName});
+  const AnaSayfa({
+    super.key, 
+    this.isGuest = false, 
+    this.phoneNumber, 
+    this.userName,
+    this.initialIndex = 0,
+  });
 
   @override
   _AnaSayfaState createState() => _AnaSayfaState();
 }
 
 class _AnaSayfaState extends State<AnaSayfa> {
-  int _seciliIndex = 0;
+  late int _seciliIndex;
   late List<Widget> _sayfalar;
 
   @override
   void initState() {
     super.initState();
+    _seciliIndex = widget.initialIndex;
     _sayfalar = [
-      AnaSayfaIcerik(musteriTelefon: widget.phoneNumber),
-      const RandevularEkrani(),
+      AnaSayfaIcerik(musteriTelefon: widget.phoneNumber, userName: widget.userName),
+      RandevularEkrani(musteriTelefon: widget.phoneNumber),
       ProfilEkrani(
         isGuest: widget.isGuest,
         phoneNumber: widget.phoneNumber,
@@ -62,33 +70,14 @@ class _AnaSayfaState extends State<AnaSayfa> {
 
 class AnaSayfaIcerik extends StatelessWidget {
   final String? musteriTelefon;
-  const AnaSayfaIcerik({super.key, this.musteriTelefon});
+  final String? userName;
+  const AnaSayfaIcerik({super.key, this.musteriTelefon, this.userName});
 
   final List<Map<String, dynamic>> berberler = const [
-    {
-      'isim': 'Ahmet Usta', 
-      'puan': '4.8', 
-      'uzaklik': '1.2 km', 
-      'resim': 'https://images.pexels.com/photos/1319460/pexels-photo-1319460.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      'isim': 'Makas Show', 
-      'puan': '4.5', 
-      'uzaklik': '800 m', 
-      'resim': 'https://images.pexels.com/photos/1813272/pexels-photo-1813272.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      'isim': 'Golden Cut', 
-      'puan': '5.0', 
-      'uzaklik': '2.5 km', 
-      'resim': 'https://images.pexels.com/photos/705255/pexels-photo-705255.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      'isim': 'Style Barber', 
-      'puan': '4.2', 
-      'uzaklik': '300 m', 
-      'resim': 'https://images.pexels.com/photos/2040189/pexels-photo-2040189.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
+    {'isim': 'Ahmet Usta', 'puan': '4.8', 'uzaklik': '1.2 km', 'resim': 'https://images.pexels.com/photos/1319460/pexels-photo-1319460.jpeg?auto=compress&cs=tinysrgb&w=400'},
+    {'isim': 'Makas Show', 'puan': '4.5', 'uzaklik': '800 m', 'resim': 'https://images.pexels.com/photos/1813272/pexels-photo-1813272.jpeg?auto=compress&cs=tinysrgb&w=400'},
+    {'isim': 'Golden Cut', 'puan': '5.0', 'uzaklik': '2.5 km', 'resim': 'https://images.pexels.com/photos/705255/pexels-photo-705255.jpeg?auto=compress&cs=tinysrgb&w=400'},
+    {'isim': 'Style Barber', 'puan': '4.2', 'uzaklik': '300 m', 'resim': 'https://images.pexels.com/photos/2040189/pexels-photo-2040189.jpeg?auto=compress&cs=tinysrgb&w=400'},
   ];
 
   @override
@@ -116,7 +105,7 @@ class AnaSayfaIcerik extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Merhaba,", style: TextStyle(fontSize: 16, color: Colors.grey[700])),
+              Text("Merhaba ${userName ?? ''},", style: TextStyle(fontSize: 16, color: Colors.grey[700])),
               Text("Hoş geldin!", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: colorScheme.primary)),
               const SizedBox(height: 20),
               TextField(
@@ -142,7 +131,6 @@ class AnaSayfaIcerik extends StatelessWidget {
   }
 
   Widget _berberKarti(BuildContext context, Map<String, dynamic> berber) {
-    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => Navigator.push(
         context, 
@@ -150,6 +138,7 @@ class AnaSayfaIcerik extends StatelessWidget {
           builder: (context) => RandevuDetayEkrani(
             berber: berber,
             musteriTelefon: musteriTelefon,
+            userName: userName,
           )
         )
       ),
@@ -192,7 +181,7 @@ class AnaSayfaIcerik extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(berber['uzaklik'], style: TextStyle(color: colorScheme.secondary, fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text(berber['uzaklik'], style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 12, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),

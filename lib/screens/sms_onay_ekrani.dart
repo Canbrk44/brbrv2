@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/database_service.dart';
+import 'ana_sayfa.dart';
 
 class SmsOnayEkrani extends StatefulWidget {
   final String berberIsmi;
   final String ustaIsmi;
   final String tarih;
   final String saat;
-  final String? musteriTelefon; // Telefon numarasını dışarıdan alıyoruz
+  final String? musteriTelefon;
+  final String? userName;
 
   const SmsOnayEkrani({
     super.key,
@@ -15,6 +18,7 @@ class SmsOnayEkrani extends StatefulWidget {
     required this.tarih,
     required this.saat,
     this.musteriTelefon,
+    this.userName,
   });
 
   @override
@@ -59,6 +63,10 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
               controller: _codeController,
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(4),
+              ],
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 10),
               decoration: InputDecoration(
                 hintText: "0000",
@@ -112,9 +120,21 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                // Doğrudan Randevularım (Index: 1) sekmesine yönlendir
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AnaSayfa(
+                      initialIndex: 1, 
+                      phoneNumber: widget.musteriTelefon,
+                      userName: widget.userName,
+                      isGuest: widget.musteriTelefon == null,
+                    ),
+                  ),
+                  (route) => false,
+                );
               },
-              child: const Text("Ana Sayfaya Dön"),
+              child: const Text("Randevularıma Git"),
             )
           ],
         ),

@@ -59,10 +59,20 @@ class DatabaseService {
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
-      print("SQLite: Müşteri kaydedildi: $adSoyad");
     } catch (e) {
       print("SQLite Müşteri Kayıt Hatası: $e");
     }
+  }
+
+  // Aktif randevusu var mı kontrol et
+  Future<bool> aktifRandevusuVarMi(String telefon) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'randevular',
+      where: 'musteriTelefon = ? AND durum = ?',
+      whereArgs: [telefon, 'aktif'],
+    );
+    return maps.isNotEmpty;
   }
 
   // Randevu Oluştur
@@ -81,8 +91,8 @@ class DatabaseService {
         'ustaIsmi': ustaIsmi,
         'tarih': tarih,
         'saat': saat,
+        'durum': 'aktif',
       });
-      print("SQLite: Randevu oluşturuldu.");
     } catch (e) {
       print("SQLite Randevu Oluşturma Hatası: $e");
     }
