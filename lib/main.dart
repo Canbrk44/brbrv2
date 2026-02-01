@@ -1,7 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'screens/giris_ekrani.dart';
 
-void main() {
+void main() async {
+  // Widget ağacını başlat
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Firebase'i başlat (google-services.json dosyası eklenmiş olmalı)
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    print("Firebase başlatılamadı, muhtemelen yapılandırma dosyası eksik: $e");
+  }
+
   runApp(const BerberApp());
 }
 

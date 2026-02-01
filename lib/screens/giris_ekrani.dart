@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/database_service.dart';
 import 'ana_sayfa.dart';
 
 class GirisEkrani extends StatefulWidget {
@@ -11,6 +12,8 @@ class GirisEkrani extends StatefulWidget {
 class _GirisEkraniState extends State<GirisEkrani> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
+  final DatabaseService _databaseService = DatabaseService();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -26,7 +29,7 @@ class _GirisEkraniState extends State<GirisEkrani> {
         children: [
           // Arka plan resmi
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               image: DecorationImage(
                 image: NetworkImage("https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=800"),
                 fit: BoxFit.cover,
@@ -121,32 +124,45 @@ class _GirisEkraniState extends State<GirisEkrani> {
                               ),
                             ),
                             const SizedBox(height: 24),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF38BDF8), // Canlı Mavi (Sky 400)
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: () {
-                                String phone = _phoneController.text;
-                                String name = _nameController.text;
-                                if (name.isNotEmpty && phone.length == 11 && phone.startsWith('0')) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => AnaSayfa(
-                                        isGuest: false,
-                                        phoneNumber: phone,
-                                        userName: name,
+                            SizedBox(
+                              width: double.infinity,
+                              height: 55,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF38BDF8),
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: _isLoading ? null : () async {
+                                  String phone = _phoneController.text;
+                                  String name = _nameController.text;
+                                  if (name.isNotEmpty && phone.length == 11 && phone.startsWith('0')) {
+                                    setState(() => _isLoading = true);
+                                    
+                                    // Veritabanına kaydet
+                                    await _databaseService.musteriKaydet(name, phone);
+                                    
+                                    setState(() => _isLoading = false);
+
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => AnaSayfa(
+                                          isGuest: false,
+                                          phoneNumber: phone,
+                                          userName: name,
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Lütfen bilgileri eksiksiz doldurun.")),
-                                  );
-                                }
-                              },
-                              child: const Text("GİRİŞ YAP", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text("Lütfen bilgileri eksiksiz doldurun.")),
+                                    );
+                                  }
+                                },
+                                child: _isLoading 
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : const Text("GİRİŞ YAP", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              ),
                             ),
                           ],
                         ),
