@@ -1,23 +1,71 @@
-import 'cloud_firestore/cloud_firestore.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 
 class DatabaseService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static final DatabaseService _instance = DatabaseService._internal();
+  factory DatabaseService() => _instance;
+  DatabaseService._internal();
 
-  // Yeni Müşteri Kaydı
+  Database? _database;
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
+  }
+
+  Future<Database> _initDatabase() async {
+    String path = join(await getDatabasesPath(), 'berber_database.db');
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: _onCreate,
+    );
+  }
+
+  Future<void> _onCreate(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE musteriler (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        adSoyad TEXT,
+        telefon TEXT UNIQUE,
+        kayitTarihi TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE randevular (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        musteriTelefon TEXT,
+        berberIsmi TEXT,
+        ustaIsmi TEXT,
+        tarih TEXT,
+        saat TEXT,
+        durum TEXT DEFAULT 'aktif'
+      )
+    ''');
+  }
+
+  // Müşteri Kaydet
   Future<void> musteriKaydet(String adSoyad, String telefon) async {
+    final db = await database;
     try {
-      await _db.collection('musteriler').doc(telefon).set({
-        'adSoyad': adSoyad,
-        'telefon': telefon,
-        'kayitTarihi': FieldValue.serverTimestamp(),
-      });
-      print("Müşteri başarıyla kaydedildi.");
+      await db.insert(
+        'musteriler',
+        {
+          'adSoyad': adSoyad,
+          'telefon': telefon,
+          'kayitTarihi': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      print("SQLite: Müşteri kaydedildi: $adSoyad");
     } catch (e) {
-      print("Müşteri kaydında hata: $e");
+      print("SQLite Müşteri Kayıt Hatası: $e");
     }
   }
 
-  // Randevu Al
+  // Randevu Oluştur
   Future<void> randevuOlustur({
     required String musteriTelefon,
     required String berberIsmi,
@@ -25,28 +73,29 @@ class DatabaseService {
     required String tarih,
     required String saat,
   }) async {
+    final db = await database;
     try {
-      await _db.collection('randevular').add({
+      await db.insert('randevular', {
         'musteriTelefon': musteriTelefon,
         'berberIsmi': berberIsmi,
         'ustaIsmi': ustaIsmi,
         'tarih': tarih,
         'saat': saat,
-        'olusturulmaTarihi': FieldValue.serverTimestamp(),
-        'durum': 'aktif',
       });
-      print("Randevu başarıyla oluşturuldu.");
+      print("SQLite: Randevu oluşturuldu.");
     } catch (e) {
-      print("Randevu oluşturulurken hata: $e");
+      print("SQLite Randevu Oluşturma Hatası: $e");
     }
   }
 
-  // Müşterinin Randevularını Getir
-  Stream<QuerySnapshot> musterininRandevulariniGetir(String telefon) {
-    return _db
-        .collection('randevular')
-        .where('musteriTelefon', isEqualTo: telefon)
-        .orderBy('olusturulmaTarihi', descending: true)
-        .snapshots();
+  // Randevuları Getir
+  Future<List<Map<String, dynamic>>> musterininRandevulariniGetir(String telefon) async {
+    final db = await database;
+    return await db.query(
+      'randevular',
+      where: 'musteriTelefon = ?',
+      whereArgs: [telefon],
+      orderBy: 'id DESC',
+    );
   }
 }

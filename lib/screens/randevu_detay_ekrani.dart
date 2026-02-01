@@ -3,8 +3,9 @@ import 'sms_onay_ekrani.dart';
 
 class RandevuDetayEkrani extends StatefulWidget {
   final Map<String, dynamic> berber;
+  final String? musteriTelefon;
 
-  RandevuDetayEkrani({required this.berber});
+  const RandevuDetayEkrani({super.key, required this.berber, this.musteriTelefon});
 
   @override
   _RandevuDetayEkraniState createState() => _RandevuDetayEkraniState();
@@ -18,9 +19,9 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
   final List<int> doluGunler = [3, 7, 12, 18, 22, 28];
 
   final List<String> ornekResimler = [
-    "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=500",
-    "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=500",
-    "https://images.unsplash.com/photo-1621605815841-2cd6100b895c?w=500",
+    "https://images.pexels.com/photos/3993323/pexels-photo-3993323.jpeg?auto=compress&cs=tinysrgb&w=400",
+    "https://images.pexels.com/photos/3992874/pexels-photo-3992874.jpeg?auto=compress&cs=tinysrgb&w=400",
+    "https://images.pexels.com/photos/3993444/pexels-photo-3993444.jpeg?auto=compress&cs=tinysrgb&w=400",
   ];
 
   final List<Map<String, String>> fiyatListesi = [
@@ -52,30 +53,26 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.berber['isim']),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Galeri Bölümü
-            Text("Galeri", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-            Container(
+            const Text("Galeri", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            SizedBox(
               height: 150,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: ornekResimler.length,
                 itemBuilder: (context, index) => Container(
-                  margin: EdgeInsets.only(right: 10),
-                  width: 200,
+                  margin: const EdgeInsets.only(right: 12),
+                  width: 220,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(15),
                     image: DecorationImage(image: NetworkImage(ornekResimler[index]), fit: BoxFit.cover),
@@ -84,29 +81,27 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
               ),
             ),
             
-            SizedBox(height: 25),
-            // Fiyat Listesi
-            Text("Hizmetler ve Fiyatlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
+            const SizedBox(height: 30),
+            const Text("Hizmetler ve Fiyatlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             Container(
-              padding: EdgeInsets.all(15),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]),
               child: Column(
                 children: fiyatListesi.map((item) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [Text(item['hizmet']!), Text(item['fiyat']!, style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor))],
+                    children: [Text(item['hizmet']!), Text(item['fiyat']!, style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.secondary))],
                   ),
                 )).toList(),
               ),
             ),
 
-            SizedBox(height: 25),
-            // Usta Seçimi
-            Text("Usta Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 15),
-            Container(
+            const SizedBox(height: 30),
+            const Text("Usta Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            SizedBox(
               height: 120,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
@@ -118,12 +113,12 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                     child: Column(
                       children: [
                         Container(
-                          margin: EdgeInsets.only(right: 15),
-                          padding: EdgeInsets.all(2),
-                          decoration: BoxDecoration(shape: BoxShape.circle, border: isSelected ? Border.all(color: primaryColor, width: 2) : null),
+                          margin: const EdgeInsets.only(right: 15),
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(shape: BoxShape.circle, border: isSelected ? Border.all(color: colorScheme.secondary, width: 2) : null),
                           child: CircleAvatar(radius: 35, backgroundImage: NetworkImage(ustalar[index]['resim']!)),
                         ),
-                        SizedBox(height: 5),
+                        const SizedBox(height: 8),
                         Text(ustalar[index]['isim']!, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
                       ],
                     ),
@@ -132,24 +127,22 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
               ),
             ),
 
-            SizedBox(height: 25),
-            // Takvim
+            const SizedBox(height: 30),
             Row(
               children: [
-                Text("Tarih Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Spacer(),
+                const Text("Tarih Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Spacer(),
                 _bilgiIkonu(Colors.green, "Boş"),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 _bilgiIkonu(Colors.red, "Dolu"),
               ],
             ),
-            SizedBox(height: 15),
-            _ozelTakvim(primaryColor),
+            const SizedBox(height: 15),
+            _ozelTakvim(colorScheme.primary),
 
-            SizedBox(height: 25),
-            // Saatler
-            Text("Saat Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 15),
+            const SizedBox(height: 30),
+            const Text("Saat Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -160,11 +153,11 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                   onTap: isDolu ? null : () => setState(() => seciliSaat = item['saat']),
                   child: Container(
                     width: (MediaQuery.of(context).size.width - 60) / 4,
-                    padding: EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: isDolu ? Colors.red.withOpacity(0.1) : (isSelected ? primaryColor : Colors.green.withOpacity(0.1)),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: isDolu ? Colors.red : (isSelected ? primaryColor : Colors.green)),
+                      color: isDolu ? Colors.red.withOpacity(0.1) : (isSelected ? colorScheme.primary : Colors.green.withOpacity(0.1)),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isDolu ? Colors.red : (isSelected ? colorScheme.primary : Colors.green)),
                     ),
                     child: Center(child: Text(item['saat'], style: TextStyle(color: isSelected ? Colors.white : (isDolu ? Colors.red : Colors.green), fontWeight: FontWeight.bold))),
                   ),
@@ -172,67 +165,51 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
               }).toList(),
             ),
 
-            SizedBox(height: 25),
-            // Harita ve Adres
-            Text("Konum", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
+            const SizedBox(height: 30),
+            const Text("Konum", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             Container(
               height: 150,
               width: double.infinity,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
-                image: DecorationImage(
-                  image: NetworkImage("https://maps.googleapis.com/maps/api/staticmap?center=41.0082,28.9784&zoom=15&size=600x300&key=YOUR_API_KEY"), // Statik harita simülasyonu
+                borderRadius: BorderRadius.circular(20),
+                image: const DecorationImage(
+                  image: NetworkImage("https://images.pexels.com/photos/1470171/pexels-photo-1470171.jpeg?auto=compress&cs=tinysrgb&w=600"),
                   fit: BoxFit.cover,
                 ),
               ),
-              child: Center(child: Icon(Icons.location_on, color: primaryColor, size: 40)),
+              child: Center(child: Icon(Icons.location_on, color: colorScheme.primary, size: 40)),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Row(
               children: [
-                Icon(Icons.map_outlined, color: primaryColor, size: 20),
-                SizedBox(width: 8),
+                Icon(Icons.map_outlined, color: colorScheme.primary, size: 20),
+                const SizedBox(width: 8),
                 Expanded(child: Text("Caferağa Mah. Moda Cad. No:123 Kadıköy / İstanbul", style: TextStyle(color: Colors.grey[700], fontSize: 14))),
               ],
             ),
 
-            SizedBox(height: 25),
-            // Yorumlar
-            Text("Müşteri Yorumları", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-            ...yorumlar.map((y) => Container(
-              margin: EdgeInsets.only(bottom: 10),
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [Text(y['isim']!, style: TextStyle(fontWeight: FontWeight.bold)), Row(children: List.generate(int.parse(y['puan']!), (i) => Icon(Icons.star, color: Colors.amber, size: 14)))],
-                  ),
-                  SizedBox(height: 5),
-                  Text(y['yorum']!, style: TextStyle(color: Colors.grey[700], fontSize: 13)),
-                ],
-              ),
-            )).toList(),
-
-            SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-                onPressed: (seciliUsta != null && seciliSaat != null)
-                    ? () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => SmsOnayEkrani(berberIsmi: widget.berber['isim'], ustaIsmi: seciliUsta!, tarih: "${seciliTarih.day}/${seciliTarih.month}/${seciliTarih.year}", saat: seciliSaat!)));
-                      }
-                    : null,
-                child: Text("Randevuyu Onayla", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: (seciliUsta != null && seciliSaat != null)
+                  ? () {
+                      Navigator.push(
+                        context, 
+                        MaterialPageRoute(
+                          builder: (context) => SmsOnayEkrani(
+                            berberIsmi: widget.berber['isim'], 
+                            ustaIsmi: seciliUsta!, 
+                            tarih: "${seciliTarih.day}/${seciliTarih.month}/${seciliTarih.year}", 
+                            saat: seciliSaat!,
+                            musteriTelefon: widget.musteriTelefon,
+                          )
+                        )
+                      );
+                    }
+                  : null,
+              child: const Text("Randevuyu Onayla"),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 30),
           ],
         ),
       ),
@@ -242,12 +219,12 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
   Widget _ozelTakvim(Color primaryColor) {
     int gunSayisi = DateTime(seciliTarih.year, seciliTarih.month + 1, 0).day;
     return Container(
-      padding: EdgeInsets.all(10),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)]),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
       child: GridView.builder(
         shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisSpacing: 5, crossAxisSpacing: 5),
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisSpacing: 5, crossAxisSpacing: 5),
         itemCount: gunSayisi,
         itemBuilder: (context, index) {
           int gun = index + 1;
@@ -266,6 +243,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
   }
 
   Widget _bilgiIkonu(Color renk, String metin) {
-    return Row(children: [Container(width: 12, height: 12, decoration: BoxDecoration(color: renk, shape: BoxShape.circle)), SizedBox(width: 4), Text(metin, style: TextStyle(fontSize: 12, color: Colors.grey[600]))]);
+    return Row(children: [Container(width: 12, height: 12, decoration: BoxDecoration(color: renk, shape: BoxShape.circle)), const SizedBox(width: 4), Text(metin, style: TextStyle(fontSize: 12, color: Colors.grey[600]))]);
   }
 }

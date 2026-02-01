@@ -22,7 +22,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
   void initState() {
     super.initState();
     _sayfalar = [
-      const AnaSayfaIcerik(),
+      AnaSayfaIcerik(musteriTelefon: widget.phoneNumber),
       const RandevularEkrani(),
       ProfilEkrani(
         isGuest: widget.isGuest,
@@ -61,13 +61,34 @@ class _AnaSayfaState extends State<AnaSayfa> {
 }
 
 class AnaSayfaIcerik extends StatelessWidget {
-  const AnaSayfaIcerik({super.key});
+  final String? musteriTelefon;
+  const AnaSayfaIcerik({super.key, this.musteriTelefon});
 
   final List<Map<String, dynamic>> berberler = const [
-    {'isim': 'Ahmet Usta', 'puan': '4.8', 'uzaklik': '1.2 km', 'resim': 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400'},
-    {'isim': 'Makas Show', 'puan': '4.5', 'uzaklik': '800 m', 'resim': 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400'},
-    {'isim': 'Golden Cut', 'puan': '5.0', 'uzaklik': '2.5 km', 'resim': 'https://images.unsplash.com/photo-1621605815841-2cd6100b895c?w=400'},
-    {'isim': 'Style Barber', 'puan': '4.2', 'uzaklik': '300 m', 'resim': 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=400'},
+    {
+      'isim': 'Ahmet Usta', 
+      'puan': '4.8', 
+      'uzaklik': '1.2 km', 
+      'resim': 'https://images.pexels.com/photos/1319460/pexels-photo-1319460.jpeg?auto=compress&cs=tinysrgb&w=400'
+    },
+    {
+      'isim': 'Makas Show', 
+      'puan': '4.5', 
+      'uzaklik': '800 m', 
+      'resim': 'https://images.pexels.com/photos/1813272/pexels-photo-1813272.jpeg?auto=compress&cs=tinysrgb&w=400'
+    },
+    {
+      'isim': 'Golden Cut', 
+      'puan': '5.0', 
+      'uzaklik': '2.5 km', 
+      'resim': 'https://images.pexels.com/photos/705255/pexels-photo-705255.jpeg?auto=compress&cs=tinysrgb&w=400'
+    },
+    {
+      'isim': 'Style Barber', 
+      'puan': '4.2', 
+      'uzaklik': '300 m', 
+      'resim': 'https://images.pexels.com/photos/2040189/pexels-photo-2040189.jpeg?auto=compress&cs=tinysrgb&w=400'
+    },
   ];
 
   @override
@@ -88,13 +109,6 @@ class AnaSayfaIcerik extends StatelessWidget {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -112,14 +126,8 @@ class AnaSayfaIcerik extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 30),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Popüler Berberler", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  TextButton(onPressed: () {}, child: const Text("Tümü")),
-                ],
-              ),
-              const SizedBox(height: 10),
+              const Text("Popüler Berberler", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -136,18 +144,22 @@ class AnaSayfaIcerik extends StatelessWidget {
   Widget _berberKarti(BuildContext context, Map<String, dynamic> berber) {
     final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RandevuDetayEkrani(berber: berber))),
+      onTap: () => Navigator.push(
+        context, 
+        MaterialPageRoute(
+          builder: (context) => RandevuDetayEkrani(
+            berber: berber,
+            musteriTelefon: musteriTelefon,
+          )
+        )
+      ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4)),
           ],
         ),
         child: Row(
@@ -168,34 +180,20 @@ class AnaSayfaIcerik extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(berber['isim'], style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
-                        Text(" ${berber['puan']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text(" (120 Yorum)", style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        berber['uzaklik'],
-                        style: TextStyle(color: colorScheme.secondary, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(berber['isim'], style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
+                      Text(" ${berber['puan']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(berber['uzaklik'], style: TextStyle(color: colorScheme.secondary, fontSize: 12, fontWeight: FontWeight.bold)),
+                ],
               ),
             ),
             const Icon(Icons.chevron_right_rounded, color: Colors.grey),
