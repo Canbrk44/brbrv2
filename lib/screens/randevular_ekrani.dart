@@ -13,8 +13,8 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
   final DatabaseService _dbService = DatabaseService();
   
   final List<Map<String, dynamic>> _eskiRandevular = [
-    {'berberIsmi': 'Ahmet Usta', 'ustaIsmi': 'Ahmet Yılmaz', 'tarih': '15/10/2023', 'saat': '10:00', 'durum': 'Tamamlandı'},
-    {'berberIsmi': 'Makas Show', 'ustaIsmi': 'Mehmet Demir', 'tarih': '02/11/2023', 'saat': '14:30', 'durum': 'Tamamlandı'},
+    {'id': -1, 'berberIsmi': 'Ahmet Usta', 'ustaIsmi': 'Ahmet Yılmaz', 'tarih': '15/10/2023', 'saat': '10:00', 'durum': 'Tamamlandı', 'oylandi': 0},
+    {'id': -2, 'berberIsmi': 'Makas Show', 'ustaIsmi': 'Mehmet Demir', 'tarih': '02/11/2023', 'saat': '14:30', 'durum': 'Tamamlandı', 'oylandi': 1},
   ];
 
   @override
@@ -53,8 +53,101 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
     );
   }
 
+  void _siraliOyVer(Map<String, dynamic> r) {
+    int salonPuani = 0;
+    int ustaPuani = 0;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text("${r['berberIsmi']} Oylayın"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Salondan memnun kaldınız mı?"),
+              const SizedBox(height: 20),
+              _yildizSecici((p) => setS(() => salonPuani = p), salonPuani),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("İPTAL")),
+            ElevatedButton(
+              onPressed: salonPuani == 0 ? null : () {
+                Navigator.pop(context);
+                _ustaOyPopup(r, (p) async {
+                  ustaPuani = p;
+                  // Veritabanında oylandı olarak işaretle
+                  if (r['id'] > 0) {
+                    await _dbService.randevuyuTamamlaVeOyla(r['id']);
+                    setState(() {}); // Ekranı güncelle
+                  } else {
+                    // Örnek veri için basit bildirim
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Değerlendirmeniz kaydedildi. Teşekkürler!"))
+                    );
+                  }
+                });
+              }, 
+              child: const Text("SONRAKİ: USTA OYLA")
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _ustaOyPopup(Map<String, dynamic> r, Function(int) onFinish) {
+    int puan = 0;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text("${r['ustaIsmi']} Oylayın"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Ustanın hizmetinden memnun kaldınız mı?"),
+              const SizedBox(height: 20),
+              _yildizSecici((p) => setS(() => puan = p), puan),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: puan == 0 ? null : () {
+                Navigator.pop(context);
+                onFinish(puan);
+              }, 
+              child: const Text("OYLAMAYI TAMAMLA")
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _yildizSecici(Function(int) onSelect, int puan) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(5, (index) => IconButton(
+        icon: Icon(
+          index < puan ? Icons.star_rounded : Icons.star_outline_rounded,
+          color: Colors.amber,
+          size: 32,
+        ),
+        onPressed: () => onSelect(index + 1),
+      )),
+    );
+  }
+
   Widget _randevuKarti(Map<String, dynamic> r, {required bool isAktif}) {
     final colorScheme = Theme.of(context).colorScheme;
+    bool oylandi = r['oylandi'] == 1;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(16),
@@ -87,8 +180,14 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
               if (!isAktif)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                  child: const Text("Bitti", style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                  decoration: BoxDecoration(
+                    color: oylandi ? Colors.blue.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8)
+                  ),
+                  child: Text(
+                    oylandi ? "Değerlendirildi" : "Bitti",
+                    style: TextStyle(color: oylandi ? Colors.blue : Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
                 ),
             ],
           ),
@@ -98,7 +197,6 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  // Harita uygulamasına yönlendirme simülasyonu
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Harita uygulamasına yönlendiriliyorsunuz...")));
                 },
                 icon: const Icon(Icons.map_outlined, size: 18),
@@ -107,6 +205,23 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
                   foregroundColor: colorScheme.primary,
                   side: BorderSide(color: colorScheme.primary.withOpacity(0.2)),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+          if (!isAktif) ...[
+            const Divider(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: oylandi ? null : () => _siraliOyVer(r),
+                icon: Icon(oylandi ? Icons.check_circle_outline : Icons.star_half_rounded, size: 18),
+                label: Text(oylandi ? "TEŞEKKÜRLER" : "DEĞERLENDİR"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: oylandi ? Colors.grey[200] : Colors.amber,
+                  foregroundColor: oylandi ? Colors.grey : Colors.black87,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: oylandi ? 0 : 2,
                 ),
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'profil_ekrani.dart';
 import 'randevular_ekrani.dart';
 import 'randevu_detay_ekrani.dart';
+import '../services/database_service.dart';
 
 class AnaSayfa extends StatefulWidget {
   final bool isGuest;
@@ -24,6 +25,7 @@ class AnaSayfa extends StatefulWidget {
 class _AnaSayfaState extends State<AnaSayfa> {
   late int _seciliIndex;
   late List<Widget> _sayfalar;
+  final DatabaseService _dbService = DatabaseService();
 
   @override
   void initState() {
@@ -38,6 +40,82 @@ class _AnaSayfaState extends State<AnaSayfa> {
         userName: widget.userName,
       ),
     ];
+
+    // Uygulama açıldığında oylanmamış geçmiş randevu kontrolü
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.phoneNumber != null) {
+        _gecmisRandevuKontrolEt();
+      }
+    });
+  }
+
+  void _gecmisRandevuKontrolEt() async {
+    final randevu = await _dbService.oylanmamisGecmisRandevuGetir(widget.phoneNumber!);
+    if (randevu != null && mounted) {
+      _oylamaPopupGoster(randevu);
+    }
+  }
+
+  void _oylamaPopupGoster(Map<String, dynamic> r) {
+    int ustaPuani = 0;
+    int berberPuani = 0;
+    final TextEditingController yorumC = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          title: Text("${r['berberIsmi']} Deneyiminizi Oylayın", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Hizmetiniz tamamlandı! Lütfen değerlendirin."),
+                const SizedBox(height: 20),
+                Text("Usta: ${r['ustaIsmi']}", style: const TextStyle(fontWeight: FontWeight.w600)),
+                _yildizSatiri((p) => setS(() => ustaPuani = p), ustaPuani),
+                const SizedBox(height: 15),
+                const Text("Berber / Salon", style: TextStyle(fontWeight: FontWeight.w600)),
+                _yildizSatiri((p) => setS(() => berberPuani = p), berberPuani),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: yorumC,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: "Yorumunuzu buraya yazın...",
+                    fillColor: Colors.grey[100],
+                    filled: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: (ustaPuani > 0 && berberPuani > 0) ? () async {
+                await _dbService.randevuyuTamamlaVeOyla(r['id']);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Değerlendirmeniz için teşekkürler!")));
+              } : null,
+              child: const Text("GÖNDER VE TAMAMLA"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _yildizSatiri(Function(int) onSelect, int puan) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(5, (index) => IconButton(
+        icon: Icon(index < puan ? Icons.star_rounded : Icons.star_outline_rounded, color: Colors.amber, size: 30),
+        onPressed: () => onSelect(index + 1),
+      )),
+    );
   }
 
   void _sayfaDegistir(int index) {
@@ -82,7 +160,6 @@ class AnaSayfaIcerik extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -106,12 +183,12 @@ class AnaSayfaIcerik extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("Merhaba ${userName ?? ''},", style: TextStyle(fontSize: 16, color: Colors.grey[700])),
-              Text("Hoş geldin!", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: colorScheme.primary)),
+              Text("Hoş geldin!", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
               const SizedBox(height: 20),
               TextField(
                 decoration: InputDecoration(
                   hintText: "Berber veya Salon ara...",
-                  prefixIcon: Icon(Icons.search_rounded, color: colorScheme.primary),
+                  prefixIcon: Icon(Icons.search_rounded, color: Theme.of(context).colorScheme.primary),
                 ),
               ),
               const SizedBox(height: 30),

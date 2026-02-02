@@ -41,7 +41,8 @@ class DatabaseService {
         ustaIsmi TEXT,
         tarih TEXT,
         saat TEXT,
-        durum TEXT DEFAULT 'aktif'
+        durum TEXT DEFAULT 'aktif',
+        oylandi INTEGER DEFAULT 0
       )
     ''');
   }
@@ -92,6 +93,7 @@ class DatabaseService {
         'tarih': tarih,
         'saat': saat,
         'durum': 'aktif',
+        'oylandi': 0
       });
     } catch (e) {
       print("SQLite Randevu Oluşturma Hatası: $e");
@@ -106,6 +108,54 @@ class DatabaseService {
       where: 'musteriTelefon = ?',
       whereArgs: [telefon],
       orderBy: 'id DESC',
+    );
+  }
+
+  // Oylanmamış ve süresi geçmiş randevuyu kontrol et
+  Future<Map<String, dynamic>?> oylanmamisGecmisRandevuGetir(String telefon) async {
+    final db = await database;
+    final List<Map<String, dynamic>> sonuclar = await db.query(
+      'randevular',
+      where: 'musteriTelefon = ? AND durum = ? AND oylandi = 0',
+      whereArgs: [telefon, 'aktif'],
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+
+    if (sonuclar.isEmpty) return null;
+
+    final r = sonuclar.first;
+    // Tarih ve saat formatını ayrıştır (Örn: "25/5/2024" ve "14:00")
+    try {
+      List<String> tParts = r['tarih'].split('/');
+      List<String> sParts = r['saat'].split(':');
+      DateTime randevuZamani = DateTime(
+        int.parse(tParts[2]), 
+        int.parse(tParts[1]), 
+        int.parse(tParts[0]),
+        int.parse(sParts[0]),
+        int.parse(sParts[1]),
+      );
+
+      // Randevu zamanından 1 saat geçmiş mi?
+      if (DateTime.now().isAfter(randevuZamani.add(const Duration(hours: 1)))) {
+        return r;
+      }
+    } catch (e) {
+      print("Tarih parse hatası: $e");
+    }
+    
+    return null;
+  }
+
+  // Randevuyu oylandı olarak işaretle ve tamamla
+  Future<void> randevuyuTamamlaVeOyla(int id) async {
+    final db = await database;
+    await db.update(
+      'randevular',
+      {'durum': 'Tamamlandı', 'oylandi': 1},
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 }

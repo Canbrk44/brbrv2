@@ -40,10 +40,10 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
     {"isim": "Emre Y.", "yorum": "Mekan çok temiz, servis harika.", "puan": "4"},
   ];
 
-  final List<Map<String, String>> ustalar = [
-    {"isim": "Ahmet Yılmaz", "resim": "https://i.pravatar.cc/150?u=1"},
-    {"isim": "Mehmet Demir", "resim": "https://i.pravatar.cc/150?u=2"},
-    {"isim": "Caner Öz", "resim": "https://i.pravatar.cc/150?u=3"},
+  final List<Map<String, dynamic>> ustalar = [
+    {"isim": "Ahmet Yılmaz", "resim": "https://i.pravatar.cc/150?u=1", "puan": "4.9"},
+    {"isim": "Mehmet Demir", "resim": "https://i.pravatar.cc/150?u=2", "puan": "4.7"},
+    {"isim": "Caner Öz", "resim": "https://i.pravatar.cc/150?u=3", "puan": "4.8"},
   ];
 
   final List<Map<String, dynamic>> saatler = [
@@ -60,7 +60,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
     String? isim = widget.userName;
 
     if (tlf == null || isim == null) {
-      // Misafir kullanıcıdan bilgi iste
       _misafirBilgiPopup((yeniIsim, yeniTlf) async {
         _devamEt(yeniTlf, yeniIsim);
       });
@@ -70,7 +69,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
   }
 
   void _devamEt(String tlf, String isim) async {
-    // 1 Randevu Kuralı Kontrolü
     bool varMi = await _dbService.aktifRandevusuVarMi(tlf);
     if (varMi) {
       if (!mounted) return;
@@ -184,7 +182,7 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
             const Text("Usta Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 15),
             SizedBox(
-              height: 120,
+              height: 130,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: ustalar.length,
@@ -194,11 +192,29 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                     onTap: () => setState(() => seciliUsta = ustalar[index]['isim']),
                     child: Column(
                       children: [
-                        Container(
-                          margin: const EdgeInsets.only(right: 15),
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(shape: BoxShape.circle, border: isSelected ? Border.all(color: colorScheme.secondary, width: 2) : null),
-                          child: CircleAvatar(radius: 35, backgroundImage: NetworkImage(ustalar[index]['resim']!)),
+                        Stack(
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(right: 15),
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(shape: BoxShape.circle, border: isSelected ? Border.all(color: colorScheme.secondary, width: 2) : null),
+                              child: CircleAvatar(radius: 35, backgroundImage: NetworkImage(ustalar[index]['resim']!)),
+                            ),
+                            Positioned(
+                              right: 15,
+                              bottom: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(10)),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.star_rounded, size: 12, color: Colors.white),
+                                    Text(ustalar[index]['puan'], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Text(ustalar[index]['isim']!, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
@@ -243,6 +259,29 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                   ),
                 );
               }).toList(),
+            ),
+            const SizedBox(height: 30),
+            const Text("Konum", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Container(
+              height: 150,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                image: const DecorationImage(
+                  image: NetworkImage("https://images.pexels.com/photos/1470171/pexels-photo-1470171.jpeg?auto=compress&cs=tinysrgb&w=600"),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: Center(child: Icon(Icons.location_on, color: colorScheme.primary, size: 40)),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.map_outlined, color: colorScheme.primary, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text("Caferağa Mah. Moda Cad. No:123 Kadıköy / İstanbul", style: TextStyle(color: Colors.grey[700], fontSize: 14))),
+              ],
             ),
             const SizedBox(height: 30),
             ElevatedButton(
