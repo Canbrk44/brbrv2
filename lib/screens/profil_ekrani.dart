@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'ana_sayfa.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'sms_onay_ekrani.dart';
+import 'giris_ekrani.dart';
 
 class ProfilEkrani extends StatefulWidget {
   final bool isGuest;
@@ -30,9 +32,7 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
@@ -50,20 +50,14 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
               const SizedBox(height: 30),
               TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.person_outline),
-                  hintText: "Adınız Soyadınız",
-                ),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.person_outline), hintText: "Adınız Soyadınız"),
               ),
               const SizedBox(height: 15),
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)],
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.phone_outlined),
-                  hintText: "05xx xxx xx xx",
-                ),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.phone_outlined), hintText: "05xx xxx xx xx"),
               ),
               const SizedBox(height: 30),
               ElevatedButton(
@@ -71,24 +65,27 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
                   String name = _nameController.text;
                   String phone = _phoneController.text;
                   if (name.isNotEmpty && phone.length == 11 && phone.startsWith('0')) {
-                    Navigator.pushAndRemoveUntil(
+                    Navigator.pop(context); // Popup'ı kapat
+                    // SMS Onayına gönder
+                    Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AnaSayfa(
-                          isGuest: false,
+                        builder: (context) => SmsOnayEkrani(
+                          isLogin: true,
                           userName: name,
-                          phoneNumber: phone,
+                          musteriTelefon: phone,
+                          berberIsmi: "",
+                          ustaIsmi: "",
+                          tarih: "",
+                          saat: "",
                         ),
                       ),
-                      (route) => false,
                     );
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Lütfen bilgileri eksiksiz ve doğru girin.")),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen bilgileri doğru girin.")));
                   }
                 },
-                child: const Text("GİRİŞİ TAMAMLA"),
+                child: const Text("SMS DOĞRULAMASINA GEÇ"),
               ),
               const SizedBox(height: 15),
             ],
@@ -101,9 +98,7 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Profil"),
-      ),
+      appBar: AppBar(title: const Text("Profil")),
       body: SingleChildScrollView(
         child: widget.isGuest ? _ziyaretciGorunumu(context) : _profilGorunumu(context),
       ),
@@ -118,34 +113,23 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
           const SizedBox(height: 50),
           Icon(Icons.account_circle_outlined, size: 100, color: Colors.grey[400]),
           const SizedBox(height: 20),
-          const Text(
-            "Profilinizi yönetmek için giriş yapın",
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
+          const Text("Profilinizi yönetmek için giriş yapın", textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
           const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: () => _girisPopupGoster(context),
-            child: const Text("GİRİŞ YAP / KAYIT OL"),
-          ),
+          ElevatedButton(onPressed: () => _girisPopupGoster(context), child: const Text("GİRİŞ YAP / KAYIT OL")),
         ],
       ),
     );
   }
 
   Widget _profilGorunumu(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
+    final primaryColor = Theme.of(context).colorScheme.primary;
     return Column(
       children: [
         const SizedBox(height: 30),
         Center(
           child: Stack(
             children: [
-              CircleAvatar(
-                radius: 55,
-                backgroundColor: primaryColor.withOpacity(0.1),
-                child: Icon(Icons.person, size: 60, color: primaryColor),
-              ),
+              CircleAvatar(radius: 55, backgroundColor: primaryColor.withOpacity(0.1), child: Icon(Icons.person, size: 60, color: primaryColor)),
               Positioned(
                 bottom: 0,
                 right: 0,
@@ -167,8 +151,22 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
         _profilMenusu(Icons.notifications_none_outlined, "Bildirim Ayarları", () {}),
         _profilMenusu(Icons.help_outline, "Yardım ve Destek", () {}),
         const SizedBox(height: 20),
-        _profilMenusu(Icons.logout, "Çıkış Yap", () => Navigator.of(context).popUntil((route) => route.isFirst), renk: Colors.red),
+        _profilMenusu(Icons.logout, "Çıkış Yap", () => _cikisYap(context), renk: Colors.red),
       ],
+    );
+  }
+
+  void _cikisYap(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // Tüm verileri sil (otomatik girişi iptal et)
+    
+    if (!mounted) return;
+    
+    // stack'i temizleyip giriş ekranına yönlendir
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const GirisEkrani()),
+      (route) => false,
     );
   }
 

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/database_service.dart';
 import 'ana_sayfa.dart';
 
 class SmsOnayEkrani extends StatefulWidget {
+  final bool isLogin; // Giriş mi yoksa Randevu onayı mı?
   final String berberIsmi;
   final String ustaIsmi;
   final String tarih;
@@ -13,6 +15,7 @@ class SmsOnayEkrani extends StatefulWidget {
 
   const SmsOnayEkrani({
     super.key,
+    this.isLogin = false,
     required this.berberIsmi,
     required this.ustaIsmi,
     required this.tarih,
@@ -35,26 +38,68 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
     super.dispose();
   }
 
+  void _dogrulaVeKaydet() async {
+    if (_codeController.text.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen 4 haneli kodu girin.")));
+      return;
+    }
+
+    if (widget.isLogin) {
+      // 1. DURUM: Giriş / Kayıt Doğrulaması
+      if (widget.userName != null && widget.musteriTelefon != null) {
+        // Kullanıcı daha önce var mı kontrol et
+        final mevcut = await _dbService.musteriGetir(widget.musteriTelefon!);
+        if (mevcut == null) {
+          // İlk kez kayıt oluyorsa SQLite'a ekle
+          await _dbService.musteriKaydet(widget.userName!, widget.musteriTelefon!);
+        }
+
+        // Otomatik giriş için SharedPreferences'a kaydet
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_phone', widget.musteriTelefon!);
+        await prefs.setString('user_name', widget.userName!);
+
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => AnaSayfa(isGuest: false, phoneNumber: widget.musteriTelefon, userName: widget.userName)),
+          (route) => false,
+        );
+      }
+    } else {
+      // 2. DURUM: Randevu Onay Doğrulaması
+      await _dbService.randevuOlustur(
+        musteriTelefon: widget.musteriTelefon ?? "Misafir",
+        berberIsmi: widget.berberIsmi,
+        ustaIsmi: widget.ustaIsmi,
+        tarih: widget.tarih,
+        saat: widget.saat,
+      );
+      if (!mounted) return;
+      _basariliDialog(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("SMS Onayı"),
-      ),
+      appBar: AppBar(title: const Text("SMS Onayı")),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.message_outlined, size: 80, color: Color(0xFF0F172A)),
+            const Icon(Icons.security_rounded, size: 80, color: Color(0xFF0F172A)),
             const SizedBox(height: 20),
-            const Text(
-              "Onay Kodu Gönderildi",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            Text(
+              widget.isLogin ? "Giriş Doğrulaması" : "Randevu Onayı",
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
             Text(
-              "${widget.berberIsmi} - ${widget.ustaIsmi}\n${widget.tarih} saat ${widget.saat} randevusu için kodu girin.",
+              widget.isLogin 
+                ? "${widget.musteriTelefon} numarasına gönderilen onay kodunu girin."
+                : "${widget.berberIsmi} randevusu için onay kodunu girin.",
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600]),
             ),
@@ -63,36 +108,14 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
               controller: _codeController,
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(4),
-              ],
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)],
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 10),
-              decoration: InputDecoration(
-                hintText: "0000",
-                hintStyle: TextStyle(color: Colors.grey[300], letterSpacing: 10),
-              ),
+              decoration: InputDecoration(hintText: "0000", hintStyle: TextStyle(color: Colors.grey[300], letterSpacing: 10)),
             ),
             const SizedBox(height: 30),
             ElevatedButton(
-              onPressed: () async {
-                if (_codeController.text.length == 4) {
-                  // SQLite'a kaydet
-                  await _dbService.randevuOlustur(
-                    musteriTelefon: widget.musteriTelefon ?? "Misafir",
-                    berberIsmi: widget.berberIsmi,
-                    ustaIsmi: widget.ustaIsmi,
-                    tarih: widget.tarih,
-                    saat: widget.saat,
-                  );
-                  _basariliDialog(context);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Lütfen 4 haneli kodu girin.")),
-                  );
-                }
-              },
-              child: const Text("Onayla ve Randevuyu Tamamla"),
+              onPressed: _dogrulaVeKaydet,
+              child: Text(widget.isLogin ? "DOĞRULA VE GİRİŞ YAP" : "ONAYLA VE RANDEVUYU TAMAMLA"),
             ),
           ],
         ),
@@ -113,24 +136,13 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
             const SizedBox(height: 20),
             const Text("Randevunuz Alındı!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            const Text(
-              "Randevu detaylarını 'Randevularım' sekmesinden görebilirsiniz.",
-              textAlign: TextAlign.center,
-            ),
+            const Text("Randevu detaylarını 'Randevularım' sekmesinden görebilirsiniz.", textAlign: TextAlign.center),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                // Doğrudan Randevularım (Index: 1) sekmesine yönlendir
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => AnaSayfa(
-                      initialIndex: 1, 
-                      phoneNumber: widget.musteriTelefon,
-                      userName: widget.userName,
-                      isGuest: widget.musteriTelefon == null,
-                    ),
-                  ),
+                  MaterialPageRoute(builder: (context) => AnaSayfa(initialIndex: 1, phoneNumber: widget.musteriTelefon, userName: widget.userName, isGuest: widget.musteriTelefon == null)),
                   (route) => false,
                 );
               },

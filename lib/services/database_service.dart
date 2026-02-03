@@ -18,8 +18,9 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'berber_database.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -45,9 +46,86 @@ class DatabaseService {
         oylandi INTEGER DEFAULT 0
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE yorumlar (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ustaIsmi TEXT,
+        salonIsmi TEXT,
+        musteriAd TEXT,
+        puan REAL,
+        yorumMetni TEXT,
+        tarih TEXT
+      )
+    ''');
   }
 
-  // Müşteri Kaydet
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE yorumlar (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ustaIsmi TEXT,
+          salonIsmi TEXT,
+          musteriAd TEXT,
+          puan REAL,
+          yorumMetni TEXT,
+          tarih TEXT
+        )
+      ''');
+    }
+  }
+
+  Future<void> yorumKaydet({
+    required String ustaIsmi,
+    required String salonIsmi,
+    required String musteriAd,
+    required double puan,
+    required String yorumMetni,
+  }) async {
+    final db = await database;
+    await db.insert('yorumlar', {
+      'ustaIsmi': ustaIsmi,
+      'salonIsmi': salonIsmi,
+      'musteriAd': musteriAd,
+      'puan': puan,
+      'yorumMetni': yorumMetni,
+      'tarih': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> ustaYorumlariniGetir(String ustaIsmi) async {
+    final db = await database;
+    return await db.query(
+      'yorumlar',
+      where: 'ustaIsmi = ?',
+      whereArgs: [ustaIsmi],
+      orderBy: 'id DESC',
+    );
+  }
+
+  // Salonun tüm yorumlarını getir
+  Future<List<Map<String, dynamic>>> salonYorumlariniGetir(String salonIsmi) async {
+    final db = await database;
+    return await db.query(
+      'yorumlar',
+      where: 'salonIsmi = ?',
+      whereArgs: [salonIsmi],
+      orderBy: 'id DESC',
+    );
+  }
+
+  Future<Map<String, dynamic>?> musteriGetir(String telefon) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'musteriler',
+      where: 'telefon = ?',
+      whereArgs: [telefon],
+    );
+    if (maps.isNotEmpty) return maps.first;
+    return null;
+  }
+
   Future<void> musteriKaydet(String adSoyad, String telefon) async {
     final db = await database;
     try {
@@ -58,14 +136,13 @@ class DatabaseService {
           'telefon': telefon,
           'kayitTarihi': DateTime.now().toIso8601String(),
         },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        conflictAlgorithm: ConflictAlgorithm.fail,
       );
     } catch (e) {
       print("SQLite Müşteri Kayıt Hatası: $e");
     }
   }
 
-  // Aktif randevusu var mı kontrol et
   Future<bool> aktifRandevusuVarMi(String telefon) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -76,7 +153,6 @@ class DatabaseService {
     return maps.isNotEmpty;
   }
 
-  // Randevu Oluştur
   Future<void> randevuOlustur({
     required String musteriTelefon,
     required String berberIsmi,
@@ -100,7 +176,6 @@ class DatabaseService {
     }
   }
 
-  // Randevuları Getir
   Future<List<Map<String, dynamic>>> musterininRandevulariniGetir(String telefon) async {
     final db = await database;
     return await db.query(
@@ -111,7 +186,22 @@ class DatabaseService {
     );
   }
 
-  // Oylanmamış ve süresi geçmiş randevuyu kontrol et
+  Future<Map<String, dynamic>?> yaklasanBugunkuRandevuyuGetir(String telefon) async {
+    final db = await database;
+    final simdi = DateTime.now();
+    final bugun = "${simdi.day}/${simdi.month}/${simdi.year}";
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'randevular',
+      where: 'musteriTelefon = ? AND tarih = ? AND durum = ?',
+      whereArgs: [telefon, bugun, 'aktif'],
+      limit: 1,
+    );
+
+    if (maps.isNotEmpty) return maps.first;
+    return null;
+  }
+
   Future<Map<String, dynamic>?> oylanmamisGecmisRandevuGetir(String telefon) async {
     final db = await database;
     final List<Map<String, dynamic>> sonuclar = await db.query(
@@ -125,7 +215,6 @@ class DatabaseService {
     if (sonuclar.isEmpty) return null;
 
     final r = sonuclar.first;
-    // Tarih ve saat formatını ayrıştır (Örn: "25/5/2024" ve "14:00")
     try {
       List<String> tParts = r['tarih'].split('/');
       List<String> sParts = r['saat'].split(':');
@@ -137,7 +226,6 @@ class DatabaseService {
         int.parse(sParts[1]),
       );
 
-      // Randevu zamanından 1 saat geçmiş mi?
       if (DateTime.now().isAfter(randevuZamani.add(const Duration(hours: 1)))) {
         return r;
       }
@@ -148,7 +236,6 @@ class DatabaseService {
     return null;
   }
 
-  // Randevuyu oylandı olarak işaretle ve tamamla
   Future<void> randevuyuTamamlaVeOyla(int id) async {
     final db = await database;
     await db.update(

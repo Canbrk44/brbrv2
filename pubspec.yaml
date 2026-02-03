@@ -10,9 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  # SQLite için gerekli paketler
   sqflite: ^2.3.0
   path: ^1.8.3
+  shared_preferences: ^2.2.2
+  url_launcher: ^6.2.1
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/giris_ekrani.dart';
+import 'screens/ana_sayfa.dart';
 
 void main() async {
-  // Widget ağacını başlat
   WidgetsFlutterBinding.ensureInitialized();
   
-  runApp(const BerberApp());
+  // Otomatik giriş kontrolü
+  final prefs = await SharedPreferences.getInstance();
+  final String? phone = prefs.getString('user_phone');
+  final String? name = prefs.getString('user_name');
+
+  runApp(BerberApp(
+    initialScreen: (phone != null && name != null) 
+      ? AnaSayfa(phoneNumber: phone, userName: name, isGuest: false)
+      : GirisEkrani(),
+  ));
 }
 
 class BerberApp extends StatelessWidget {
-  const BerberApp({super.key});
+  final Widget initialScreen;
+  const BerberApp({super.key, required this.initialScreen});
 
   @override
   Widget build(BuildContext context) {
@@ -18,11 +29,11 @@ class BerberApp extends StatelessWidget {
       title: 'MyRandevum',
       theme: ThemeData(
         useMaterial3: true,
-        primaryColor: const Color(0xFF0F172A), // Slate 900
+        primaryColor: const Color(0xFF0F172A),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF0F172A),
           primary: const Color(0xFF0F172A),
-          secondary: const Color(0xFF38BDF8), // Sky 400
+          secondary: const Color(0xFF38BDF8),
           surface: Colors.white,
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
@@ -46,25 +57,8 @@ class BerberApp extends StatelessWidget {
             elevation: 0,
           ),
         ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.5),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        ),
       ),
-      home: GirisEkrani(),
+      home: initialScreen,
     );
   }
 }
