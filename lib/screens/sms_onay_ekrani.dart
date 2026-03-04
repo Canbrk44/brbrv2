@@ -1,17 +1,20 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/database_service.dart';
 import 'ana_sayfa.dart';
 
 class SmsOnayEkrani extends StatefulWidget {
-  final bool isLogin; // Giriş mi yoksa Randevu onayı mı?
+  final bool isLogin;
   final String berberIsmi;
   final String ustaIsmi;
   final String tarih;
   final String saat;
   final String? musteriTelefon;
   final String? userName;
+  final String? kisiTuru;
 
   const SmsOnayEkrani({
     super.key,
@@ -22,6 +25,7 @@ class SmsOnayEkrani extends StatefulWidget {
     required this.saat,
     this.musteriTelefon,
     this.userName,
+    this.kisiTuru,
   });
 
   @override
@@ -45,16 +49,12 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
     }
 
     if (widget.isLogin) {
-      // 1. DURUM: Giriş / Kayıt Doğrulaması
       if (widget.userName != null && widget.musteriTelefon != null) {
-        // Kullanıcı daha önce var mı kontrol et
         final mevcut = await _dbService.musteriGetir(widget.musteriTelefon!);
         if (mevcut == null) {
-          // İlk kez kayıt oluyorsa SQLite'a ekle
           await _dbService.musteriKaydet(widget.userName!, widget.musteriTelefon!);
         }
 
-        // Otomatik giriş için SharedPreferences'a kaydet
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_phone', widget.musteriTelefon!);
         await prefs.setString('user_name', widget.userName!);
@@ -67,14 +67,36 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
         );
       }
     } else {
-      // 2. DURUM: Randevu Onay Doğrulaması
+      // Randevuyu önce yerel SQLite'a kaydet
       await _dbService.randevuOlustur(
         musteriTelefon: widget.musteriTelefon ?? "Misafir",
         berberIsmi: widget.berberIsmi,
         ustaIsmi: widget.ustaIsmi,
         tarih: widget.tarih,
         saat: widget.saat,
+        kisiTuru: widget.kisiTuru ?? "Yetişkin",
       );
+
+      // Randevuyu sunucuya da gönder (Admin dashboard için)
+      try {
+        await http.post(
+          Uri.parse('http://10.0.2.2:3000/api/randevular'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'musteriTelefon': widget.musteriTelefon ?? "Misafir",
+            'musteriAd': widget.userName ?? "Misafir",
+            'berberIsmi': widget.berberIsmi,
+            'ustaIsmi': widget.ustaIsmi,
+            'tarih': widget.tarih,
+            'saat': widget.saat,
+            'kisiTuru': widget.kisiTuru ?? "Yetişkin",
+            'durum': 'aktif'
+          }),
+        );
+      } catch (e) {
+        debugPrint("Sunucuya randevu iletilemedi: $e");
+      }
+
       if (!mounted) return;
       _basariliDialog(context);
     }
@@ -142,7 +164,7 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
               onPressed: () {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => AnaSayfa(initialIndex: 1, phoneNumber: widget.musteriTelefon, userName: widget.userName, isGuest: widget.musteriTelefon == null)),
+                  MaterialPageRoute(builder: (context) => AnaSayfa(initialIndex: 2, phoneNumber: widget.musteriTelefon, userName: widget.userName, isGuest: widget.musteriTelefon == null)),
                   (route) => false,
                 );
               },

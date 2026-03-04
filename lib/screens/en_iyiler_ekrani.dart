@@ -1,103 +1,141 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../services/database_service.dart';
 import 'randevu_detay_ekrani.dart';
 
-class EnIyilerEkrani extends StatelessWidget {
+class EnIyilerEkrani extends StatefulWidget {
   final String? musteriTelefon;
   final String? userName;
 
   const EnIyilerEkrani({super.key, this.musteriTelefon, this.userName});
 
-  final List<Map<String, dynamic>> enIyiSalonlar = const [
-    {
-      'isim': 'Golden Cut',
-      'puan': '5.0',
-      'resim': 'https://images.pexels.com/photos/705255/pexels-photo-705255.jpeg?auto=compress&cs=tinysrgb&w=600',
-      'enIyiUsta': 'Caner Öz'
-    },
-    {
-      'isim': 'Ahmet Usta',
-      'puan': '4.8',
-      'resim': 'https://images.pexels.com/photos/1319460/pexels-photo-1319460.jpeg?auto=compress&cs=tinysrgb&w=600',
-      'enIyiUsta': 'Ahmet Yılmaz'
-    },
-  ];
+  @override
+  State<EnIyilerEkrani> createState() => _EnIyilerEkraniState();
+}
 
-  final List<Map<String, dynamic>> enIyiUstalar = const [
-    {'isim': 'Caner Öz', 'salon': 'Golden Cut', 'puan': '5.0', 'resim': 'https://i.pravatar.cc/150?u=3', 'yorum': 'Gerçek bir sanatçı, saç kesimi konusunda üzerine tanımam.'},
-    {'isim': 'Ahmet Yılmaz', 'salon': 'Ahmet Usta', 'puan': '4.9', 'resim': 'https://i.pravatar.cc/150?u=1', 'yorum': 'Sakal tıraşında çok titiz, kesinlikle tavsiye ederim.'},
-    {'isim': 'Selin Ak', 'salon': 'Style Barber', 'puan': '4.8', 'resim': 'https://i.pravatar.cc/150?u=4', 'yorum': 'Modern kesimler için tek adres Selin Hanım.'},
-  ];
+class _EnIyilerEkraniState extends State<EnIyilerEkrani> {
+  Future<Map<String, List<Map<String, dynamic>>>> _getEnIyiler() async {
+    try {
+      final salonlarRes = await http.get(Uri.parse('http://10.0.2.2:3000/api/salonlar'));
+      final ustalarRes = await http.get(Uri.parse('http://10.0.2.2:3000/api/ustalar'));
+
+      if (salonlarRes.statusCode == 200 && ustalarRes.statusCode == 200) {
+        List<Map<String, dynamic>> salonlar = List<Map<String, dynamic>>.from(json.decode(salonlarRes.body));
+        List<Map<String, dynamic>> ustalar = List<Map<String, dynamic>>.from(json.decode(ustalarRes.body));
+
+        // Puanlara göre sıralayıp en iyileri alalım (Örnek mantık)
+        salonlar.sort((a, b) => (double.tryParse(b['puan']?.toString() ?? "0") ?? 0)
+            .compareTo(double.tryParse(a['puan']?.toString() ?? "0") ?? 0));
+        
+        ustalar.sort((a, b) => (double.tryParse(b['puan']?.toString() ?? "0") ?? 0)
+            .compareTo(double.tryParse(a['puan']?.toString() ?? "0") ?? 0));
+
+        return {
+          'salonlar': salonlar.take(5).toList(),
+          'ustalar': ustalar.take(10).toList(),
+        };
+      }
+    } catch (e) {
+      debugPrint("API Baglanti Hatasi: $e");
+    }
+    return {'salonlar': [], 'ustalar': []};
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120.0,
-            floating: true,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: const Text("En İyiler", style: TextStyle(fontWeight: FontWeight.bold)),
-              centerTitle: true,
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [colorScheme.primary.withOpacity(0.05), Colors.white],
+      body: FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
+        future: _getEnIyiler(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final data = snapshot.data ?? {'salonlar': [], 'ustalar': []};
+          final enIyiSalonlar = data['salonlar']!;
+          final enIyiUstalar = data['ustalar']!;
+
+          return CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 120.0,
+                floating: true,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  title: const Text("En İyiler", style: TextStyle(fontWeight: FontWeight.bold)),
+                  centerTitle: true,
+                  background: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [colorScheme.primary.withOpacity(0.05), Colors.white],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
-                  const Row(
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 28),
-                      SizedBox(width: 10),
-                      Text("En İyi Salonlar", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 20),
+                      const Row(
+                        children: [
+                          Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 28),
+                          SizedBox(width: 10),
+                          Text("En İyi Salonlar", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      if (enIyiSalonlar.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Text("Henüz kayıtlı salon bulunmuyor."),
+                        )
+                      else
+                        SizedBox(
+                          height: 240,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: enIyiSalonlar.length,
+                            itemBuilder: (context, index) => _salonKarti(context, enIyiSalonlar[index]),
+                          ),
+                        ),
+                      const SizedBox(height: 40),
+                      const Row(
+                        children: [
+                          Icon(Icons.stars_rounded, color: Color(0xFF38BDF8), size: 28),
+                          SizedBox(width: 10),
+                          Text("En İyi Ustalar", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      if (enIyiUstalar.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Text("Henüz kayıtlı usta bulunmuyor."),
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: enIyiUstalar.length,
+                          itemBuilder: (context, index) => _ustaKarti(context, enIyiUstalar[index], enIyiSalonlar),
+                        ),
+                      const SizedBox(height: 40),
                     ],
                   ),
-                  const SizedBox(height: 15),
-                  SizedBox(
-                    height: 240,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: enIyiSalonlar.length,
-                      itemBuilder: (context, index) => _salonKarti(context, enIyiSalonlar[index]),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  const Row(
-                    children: [
-                      Icon(Icons.stars_rounded, color: Color(0xFF38BDF8), size: 28),
-                      SizedBox(width: 10),
-                      Text("En İyi Ustalar", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: enIyiUstalar.length,
-                    itemBuilder: (context, index) => _ustaKarti(context, enIyiUstalar[index]),
-                  ),
-                  const SizedBox(height: 40),
-                ],
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -109,8 +147,8 @@ class EnIyilerEkrani extends StatelessWidget {
         MaterialPageRoute(
           builder: (context) => RandevuDetayEkrani(
             berber: s, 
-            musteriTelefon: musteriTelefon, 
-            userName: userName
+            musteriTelefon: widget.musteriTelefon, 
+            userName: widget.userName
           )
         )
       ),
@@ -136,7 +174,10 @@ class EnIyilerEkrani extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  image: DecorationImage(image: NetworkImage(s['resim']), fit: BoxFit.cover),
+                  image: DecorationImage(
+                    image: NetworkImage(s['resim'] ?? 'https://images.pexels.com/photos/3993323/pexels-photo-3993323.jpeg'), 
+                    fit: BoxFit.cover
+                  ),
                 ),
               ),
             ),
@@ -148,13 +189,13 @@ class EnIyilerEkrani extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(s['isim'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text(s['isim'] ?? 'Salon', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     const SizedBox(height: 6),
                     Row(
                       children: [
                         const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
                         const SizedBox(width: 4),
-                        Text(s['puan'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(s['puan']?.toString() ?? "0.0", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         const Spacer(),
                         const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.grey),
                       ],
@@ -169,9 +210,9 @@ class EnIyilerEkrani extends StatelessWidget {
     );
   }
 
-  Widget _ustaKarti(BuildContext context, Map<String, dynamic> u) {
+  Widget _ustaKarti(BuildContext context, Map<String, dynamic> u, List<Map<String, dynamic>> enIyiSalonlar) {
     return GestureDetector(
-      onTap: () => _ustaBilgiPopup(context, u),
+      onTap: () => _ustaBilgiPopup(context, u, enIyiSalonlar),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
@@ -191,7 +232,10 @@ class EnIyilerEkrani extends StatelessWidget {
           children: [
             Stack(
               children: [
-                CircleAvatar(radius: 35, backgroundImage: NetworkImage(u['resim'])),
+                CircleAvatar(
+                  radius: 35, 
+                  backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=1')
+                ),
                 Positioned(
                   bottom: 0,
                   right: 0,
@@ -208,9 +252,9 @@ class EnIyilerEkrani extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(u['isim'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                  Text(u['isim'] ?? 'Usta', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
                   const SizedBox(height: 4),
-                  Text(u['salon'], style: TextStyle(color: Colors.grey[600], fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text(u['salon'] ?? 'Salon', style: TextStyle(color: Colors.grey[600], fontSize: 14, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
@@ -221,7 +265,7 @@ class EnIyilerEkrani extends StatelessWidget {
                 children: [
                   const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
                   const SizedBox(width: 4),
-                  Text(u['puan'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber)),
+                  Text(u['puan']?.toString() ?? "0.0", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber)),
                 ],
               ),
             ),
@@ -231,9 +275,8 @@ class EnIyilerEkrani extends StatelessWidget {
     );
   }
 
-  void _ustaBilgiPopup(BuildContext context, Map<String, dynamic> u) {
+  void _ustaBilgiPopup(BuildContext context, Map<String, dynamic> u, List<Map<String, dynamic>> allSalonlar) {
     final DatabaseService dbService = DatabaseService();
-    final colorScheme = Theme.of(context).colorScheme;
 
     showModalBottomSheet(
       context: context,
@@ -250,14 +293,21 @@ class EnIyilerEkrani extends StatelessWidget {
             const SizedBox(height: 12),
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 30),
-            CircleAvatar(radius: 55, backgroundImage: NetworkImage(u['resim'])),
+            CircleAvatar(radius: 55, backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=1')),
             const SizedBox(height: 16),
-            Text(u['isim'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            Text(u['salon'], style: TextStyle(color: Colors.grey[600], fontSize: 16, fontWeight: FontWeight.w500)),
+            Text(u['isim'] ?? 'Usta', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(u['salon'] ?? 'Salon', style: TextStyle(color: Colors.grey[600], fontSize: 16, fontWeight: FontWeight.w500)),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (i) => const Icon(Icons.star_rounded, color: Colors.amber, size: 28)),
+              children: List.generate(5, (i) {
+                double p = double.tryParse(u['puan']?.toString() ?? "0") ?? 0;
+                return Icon(
+                  Icons.star_rounded, 
+                  color: i < p.floor() ? Colors.amber : Colors.grey[300], 
+                  size: 28
+                );
+              }),
             ),
             const SizedBox(height: 30),
             Expanded(
@@ -271,7 +321,7 @@ class EnIyilerEkrani extends StatelessWidget {
                     const SizedBox(height: 16),
                     Expanded(
                       child: FutureBuilder<List<Map<String, dynamic>>>(
-                        future: dbService.ustaYorumlariniGetir(u['isim']),
+                        future: dbService.ustaYorumlariniGetir(u['isim'] ?? ""),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
                           
@@ -338,8 +388,17 @@ class EnIyilerEkrani extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  final salon = enIyiSalonlar.firstWhere((s) => s['isim'] == u['salon'], orElse: () => {'isim': u['salon'], 'puan': u['puan'], 'resim': 'https://images.pexels.com/photos/1319460/pexels-photo-1319460.jpeg?auto=compress&cs=tinysrgb&w=400'});
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => RandevuDetayEkrani(berber: salon, musteriTelefon: musteriTelefon, userName: userName)));
+                  // Salon bilgisini bulmaya çalış
+                  final salon = allSalonlar.firstWhere(
+                    (s) => s['isim'] == u['salon'], 
+                    orElse: () => {
+                      'id': u['salonId'],
+                      'isim': u['salon'], 
+                      'puan': u['puan'], 
+                      'resim': 'https://images.pexels.com/photos/1319460/pexels-photo-1319460.jpeg?auto=compress&cs=tinysrgb&w=400'
+                    }
+                  );
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => RandevuDetayEkrani(berber: salon, musteriTelefon: widget.musteriTelefon, userName: widget.userName)));
                 },
                 child: const Text("USTADAN RANDEVU AL"),
               ),

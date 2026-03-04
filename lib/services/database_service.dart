@@ -18,7 +18,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'berber_database.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 4, // Versiyonu 4'e yükseltiyoruz
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -42,7 +42,9 @@ class DatabaseService {
         ustaIsmi TEXT,
         tarih TEXT,
         saat TEXT,
+        kisiTuru TEXT,
         durum TEXT DEFAULT 'aktif',
+        onayDurumu TEXT DEFAULT 'bekliyor',
         oylandi INTEGER DEFAULT 0
       )
     ''');
@@ -74,6 +76,44 @@ class DatabaseService {
         )
       ''');
     }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE randevular ADD COLUMN kisiTuru TEXT');
+    }
+    if (oldVersion < 4) {
+      // Randevular tablosuna onayDurumu sütunu ekle
+      await db.execute('ALTER TABLE randevular ADD COLUMN onayDurumu TEXT DEFAULT "bekliyor"');
+    }
+  }
+
+  // Usta için bekleyen randevuları getir
+  Future<List<Map<String, dynamic>>> bekleyenRandevulariGetir(String ustaIsmi) async {
+    final db = await database;
+    return await db.query(
+      'randevular',
+      where: 'ustaIsmi = ? AND onayDurumu = ?',
+      whereArgs: [ustaIsmi, 'bekliyor'],
+    );
+  }
+
+  // Randevu onay durumunu güncelle
+  Future<void> randevuOnayla(int id, bool onaylandi) async {
+    final db = await database;
+    await db.update(
+      'randevular',
+      {'onayDurumu': onaylandi ? 'onaylandi' : 'reddedildi'},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> aktifRandevuSayisi(String telefon) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'randevular',
+      where: 'musteriTelefon = ? AND durum = ?',
+      whereArgs: [telefon, 'aktif'],
+    );
+    return maps.length;
   }
 
   Future<void> yorumKaydet({
@@ -104,7 +144,6 @@ class DatabaseService {
     );
   }
 
-  // Salonun tüm yorumlarını getir
   Future<List<Map<String, dynamic>>> salonYorumlariniGetir(String salonIsmi) async {
     final db = await database;
     return await db.query(
@@ -143,22 +182,13 @@ class DatabaseService {
     }
   }
 
-  Future<bool> aktifRandevusuVarMi(String telefon) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'randevular',
-      where: 'musteriTelefon = ? AND durum = ?',
-      whereArgs: [telefon, 'aktif'],
-    );
-    return maps.isNotEmpty;
-  }
-
   Future<void> randevuOlustur({
     required String musteriTelefon,
     required String berberIsmi,
     required String ustaIsmi,
     required String tarih,
     required String saat,
+    required String kisiTuru,
   }) async {
     final db = await database;
     try {
@@ -168,7 +198,9 @@ class DatabaseService {
         'ustaIsmi': ustaIsmi,
         'tarih': tarih,
         'saat': saat,
+        'kisiTuru': kisiTuru,
         'durum': 'aktif',
+        'onayDurumu': 'bekliyor', // Varsayılan olarak bekliyor
         'oylandi': 0
       });
     } catch (e) {
@@ -193,8 +225,8 @@ class DatabaseService {
 
     final List<Map<String, dynamic>> maps = await db.query(
       'randevular',
-      where: 'musteriTelefon = ? AND tarih = ? AND durum = ?',
-      whereArgs: [telefon, bugun, 'aktif'],
+      where: 'musteriTelefon = ? AND tarih = ? AND durum = ? AND onayDurumu = ?',
+      whereArgs: [telefon, bugun, 'aktif', 'onaylandi'],
       limit: 1,
     );
 
@@ -206,8 +238,8 @@ class DatabaseService {
     final db = await database;
     final List<Map<String, dynamic>> sonuclar = await db.query(
       'randevular',
-      where: 'musteriTelefon = ? AND durum = ? AND oylandi = 0',
-      whereArgs: [telefon, 'aktif'],
+      where: 'musteriTelefon = ? AND durum = ? AND oylandi = 0 AND onayDurumu = ?',
+      whereArgs: [telefon, 'aktif', 'onaylandi'],
       orderBy: 'id DESC',
       limit: 1,
     );

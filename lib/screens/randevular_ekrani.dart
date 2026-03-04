@@ -16,10 +16,8 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
   final DatabaseService _dbService = DatabaseService();
   String? _currentUserName;
   
-  final List<Map<String, dynamic>> _eskiRandevular = [
-    {'id': -1, 'berberIsmi': 'Ahmet Usta', 'ustaIsmi': 'Ahmet Yılmaz', 'tarih': '15/10/2023', 'saat': '10:00', 'durum': 'Tamamlandı', 'oylandi': 0},
-    {'id': -2, 'berberIsmi': 'Makas Show', 'ustaIsmi': 'Mehmet Demir', 'tarih': '02/11/2023', 'saat': '14:30', 'durum': 'Tamamlandı', 'oylandi': 1},
-  ];
+  // Örnek veriler silindi
+  final List<Map<String, dynamic>> _eskiRandevular = [];
 
   @override
   void initState() {
@@ -119,9 +117,11 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
-          final aktifRandevular = snapshot.data ?? [];
+          final allRandevular = snapshot.data ?? [];
+          final aktifRandevular = allRandevular.where((r) => r['durum'] == 'aktif').toList();
+          final gecmisRandevular = allRandevular.where((r) => r['durum'] != 'aktif').toList();
 
-          if (aktifRandevular.isEmpty && _eskiRandevular.isEmpty) {
+          if (aktifRandevular.isEmpty && gecmisRandevular.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -143,9 +143,11 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
                 ...aktifRandevular.map((r) => _randevuKarti(r, isAktif: true)),
                 const SizedBox(height: 30),
               ],
-              const Text("Geçmiş Randevular", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 15),
-              ..._eskiRandevular.map((r) => _randevuKarti(r, isAktif: false)),
+              if (gecmisRandevular.isNotEmpty) ...[
+                const Text("Geçmiş Randevular", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 15),
+                ...gecmisRandevular.map((r) => _randevuKarti(r, isAktif: false)),
+              ],
             ],
           );
         },
@@ -271,10 +273,6 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
                   );
                   await _dbService.randevuyuTamamlaVeOyla(r['id']);
                   setState(() {});
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Değerlendirmeniz kaydedildi. Teşekkürler!"))
-                  );
                 }
               }, 
               child: const Text("OYLAMAYI TAMAMLA")
