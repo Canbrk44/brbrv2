@@ -1,36 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'screens/giris_ekrani.dart';
 import 'screens/ana_sayfa.dart';
+import 'firebase_options.dart';
 
 void main() async {
-  // Uygulama başlatılmadan önce Flutter bileşenlerini hazırla
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Kullanıcı bilgilerini güvenli bir şekilde çek
-  String? phone;
-  String? name;
-  
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    phone = prefs.getString('user_phone');
-    name = prefs.getString('user_name');
-  } catch (e) {
-    debugPrint("SharedPreferences hatası: $e");
-  }
 
-  // Konum iznini iste ama uygulamanın açılmasını engelleme (Arka planda çalışsın)
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  final prefs = await SharedPreferences.getInstance();
+  final String? phone = prefs.getString('user_phone');
+  final String? name = prefs.getString('user_name');
+
   _konumIzniIste();
 
   runApp(BerberApp(
-    initialScreen: (phone != null && name != null) 
-      ? AnaSayfa(phoneNumber: phone, userName: name, isGuest: false)
-      : const GirisEkrani(),
+    initialScreen: (phone != null && name != null)
+        ? AnaSayfa(phoneNumber: phone, userName: name, isGuest: false)
+        : const GirisEkrani(),
   ));
 }
 
-// Konum izni isteme fonksiyonu (Daha güvenli ve asenkron)
 void _konumIzniIste() async {
   try {
     bool servisEtkin = await Geolocator.isLocationServiceEnabled();
@@ -41,7 +36,7 @@ void _konumIzniIste() async {
       await Geolocator.requestPermission();
     }
   } catch (e) {
-    debugPrint("Konum izni istenirken hata oluştu: $e");
+    debugPrint("Konum hatası: $e");
   }
 }
 
@@ -56,9 +51,9 @@ class BerberApp extends StatelessWidget {
       title: 'MyRandevum',
       theme: ThemeData(
         useMaterial3: true,
-        primaryColor: const Color(0xFF0F172A),
+        primaryColor: Colors.black,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0F172A),
+          seedColor: Colors.black,
           primary: const Color(0xFF0F172A),
           secondary: const Color(0xFF38BDF8),
           surface: Colors.white,

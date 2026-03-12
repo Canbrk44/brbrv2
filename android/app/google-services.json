@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "210770087671",
+    "project_id": "randevucu-30a3d",
+    "storage_bucket": "randevucu-30a3d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:210770087671:android:3a395f973eba312012cdf2",
+        "android_client_info": {
+          "package_name": "com.example.brbrv2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwVtfzv7B3cjE2qKHVD6NhqCOPeKybrzY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
