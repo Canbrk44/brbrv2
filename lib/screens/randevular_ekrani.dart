@@ -15,9 +15,6 @@ class RandevularEkrani extends StatefulWidget {
 class _RandevularEkraniState extends State<RandevularEkrani> {
   final DatabaseService _dbService = DatabaseService();
   String? _currentUserName;
-  
-  // Örnek veriler silindi
-  final List<Map<String, dynamic>> _eskiRandevular = [];
 
   @override
   void initState() {
@@ -32,362 +29,157 @@ class _RandevularEkraniState extends State<RandevularEkrani> {
     });
   }
 
-  void _girisPopupGoster(BuildContext context) {
-    final nameC = TextEditingController();
-    final phoneC = TextEditingController();
+  @override
+  Widget build(BuildContext context) {
+    final bool isGuest = widget.musteriTelefon == null || widget.musteriTelefon!.isEmpty;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(30.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 25),
-              const Text("Giriş Yap / Kayıt Ol", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              Text("Randevularınızı görmek için bilgilerinizi girin.", style: TextStyle(color: Colors.grey[600])),
-              const SizedBox(height: 30),
-              TextField(
-                controller: nameC,
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.person_outline), hintText: "Adınız Soyadınız"),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: phoneC,
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)],
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.phone_outlined), hintText: "05xx xxx xx xx"),
-              ),
-              const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: () {
-                  String name = nameC.text;
-                  String phone = phoneC.text;
-                  if (name.isNotEmpty && phone.length == 11 && phone.startsWith('0')) {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SmsOnayEkrani(
-                          isLogin: true,
-                          userName: name,
-                          musteriTelefon: phone,
-                          berberIsmi: "",
-                          ustaIsmi: "",
-                          tarih: "",
-                          saat: "",
-                        ),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen bilgileri doğru girin.")));
-                  }
-                },
-                child: const Text("SMS DOĞRULAMASINA GEÇ"),
-              ),
-              const SizedBox(height: 15),
-            ],
+    return Scaffold(
+      backgroundColor: const Color(0xFFFDF5E6),
+      appBar: AppBar(title: const Text("Randevularım"), elevation: 0),
+      body: isGuest 
+      ? _ziyaretciGorunumu(context)
+      : RefreshIndicator(
+          onRefresh: () async => setState(() {}),
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _dbService.musterininRandevulariniGetir(widget.musteriTelefon!),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+              if (snapshot.hasError) return const Center(child: Text("Veriler yüklenirken bir hata oluştu."));
+
+              final all = snapshot.data ?? [];
+              if (all.isEmpty) return const Center(child: Text("Henüz randevunuz yok."));
+
+              final aktif = all.where((r) => (r['durum'] ?? 'aktif') == 'aktif').toList();
+              final gecmis = all.where((r) => (r['durum'] ?? 'aktif') != 'aktif').toList();
+
+              return ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  if (aktif.isNotEmpty) ...[
+                    const Text("Aktif Randevular", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    ...aktif.map((r) => _randevuKarti(r, true)),
+                  ],
+                  if (gecmis.isNotEmpty) ...[
+                    const SizedBox(height: 25),
+                    const Text("Geçmiş Randevular", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    const SizedBox(height: 10),
+                    ...gecmis.map((r) => _randevuKarti(r, false)),
+                  ],
+                ],
+              );
+            },
           ),
         ),
+    );
+  }
+
+  Widget _randevuKarti(Map<String, dynamic> r, bool isAktif) {
+    bool oylandi = (r['oylandi'] ?? 0) == 1;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(15), 
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)]
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+        title: Text(r['berberIsmi'] ?? "Salon", style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text("${r['ustaIsmi'] ?? 'Usta'}\n${r['tarih'] ?? ''} - ${r['saat'] ?? ''}"),
+        trailing: isAktif 
+          ? ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green[700], 
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(70, 35),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => _trendyolOylamaPopup(r),
+              child: const Text("TAMAMLA", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+            )
+          : ElevatedButton(
+              onPressed: oylandi ? null : () => _trendyolOylamaPopup(r),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: oylandi ? Colors.grey[300] : const Color(0xFF4E342E), 
+                foregroundColor: oylandi ? Colors.grey[600] : Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(70, 35),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(oylandi ? "OYLANDI" : "OYLA", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+            ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final bool isGuest = widget.musteriTelefon == null;
+  void _trendyolOylamaPopup(Map<String, dynamic> r) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        int step = 1;
+        double sP = 0, uP = 0;
+        final sC = TextEditingController(), uC = TextEditingController();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("Randevularım")),
-      body: isGuest 
-      ? _ziyaretciGorunumu(context)
-      : FutureBuilder<List<Map<String, dynamic>>>(
-        future: _dbService.musterininRandevulariniGetir(widget.musteriTelefon!),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-
-          final allRandevular = snapshot.data ?? [];
-          final aktifRandevular = allRandevular.where((r) => r['durum'] == 'aktif').toList();
-          final gecmisRandevular = allRandevular.where((r) => r['durum'] != 'aktif').toList();
-
-          if (aktifRandevular.isEmpty && gecmisRandevular.isEmpty) {
-            return Center(
+        return StatefulBuilder(
+          builder: (context, setS) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(step == 1 ? "Salonu Puanla" : "Ustayı Puanla", textAlign: TextAlign.center),
+            content: SingleChildScrollView(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.calendar_today_outlined, size: 80, color: Colors.grey[300]),
-                  const SizedBox(height: 20),
-                  const Text("Henüz bir randevunuz bulunmuyor.", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+                  Text(step == 1 ? "${r['berberIsmi']} hizmeti?" : "${r['ustaIsmi']} becerisi?", style: const TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (i) => IconButton(
+                      icon: Icon(i < (step == 1 ? sP : uP) ? Icons.star_rounded : Icons.star_outline_rounded, color: Colors.amber, size: 35),
+                      onPressed: () => setS(() => step == 1 ? sP = i + 1.0 : uP = i + 1.0),
+                    )),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: step == 1 ? sC : uC,
+                    maxLines: 2,
+                    decoration: InputDecoration(hintText: "Yorumunuz...", filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                  ),
                 ],
               ),
-            );
-          }
-
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              if (aktifRandevular.isNotEmpty) ...[
-                const Text("Aktif Randevular", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 15),
-                ...aktifRandevular.map((r) => _randevuKarti(r, isAktif: true)),
-                const SizedBox(height: 30),
-              ],
-              if (gecmisRandevular.isNotEmpty) ...[
-                const Text("Geçmiş Randevular", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 15),
-                ...gecmisRandevular.map((r) => _randevuKarti(r, isAktif: false)),
-              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text("İptal")),
+              ElevatedButton(
+                onPressed: (step == 1 ? sP : uP) == 0 ? null : () async {
+                  if (step == 1) {
+                    setS(() => step = 2);
+                  } else {
+                    await _dbService.yorumKaydet(
+                      randevuId: r['id'] ?? "",
+                      ustaIsmi: r['ustaIsmi'] ?? "",
+                      salonIsmi: r['berberIsmi'] ?? "",
+                      musteriAd: _currentUserName ?? "Müşteri",
+                      salonPuan: sP,
+                      salonYorum: sC.text,
+                      ustaPuan: uP,
+                      ustaYorum: uC.text,
+                    );
+                    if (context.mounted) Navigator.pop(context);
+                    setState(() {});
+                  }
+                },
+                child: Text(step == 1 ? "SONRAKİ" : "GÖNDER"),
+              ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
   Widget _ziyaretciGorunumu(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.lock_outline_rounded, size: 100, color: Colors.grey[300]),
-            const SizedBox(height: 24),
-            const Text(
-              "Randevularınızı görmek için lütfen giriş yapın.",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, color: Colors.black87, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () => _girisPopupGoster(context),
-              child: const Text("GİRİŞ YAP / KAYIT OL"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _siraliOyVer(Map<String, dynamic> r) {
-    int salonPuani = 0;
-    final TextEditingController salonYorumC = TextEditingController();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-          title: Text("${r['berberIsmi']} Oylayın"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("Salondan memnun kaldınız mı?"),
-                const SizedBox(height: 20),
-                _yildizSecici((p) => setS(() => salonPuani = p), salonPuani),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: salonYorumC,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: "Salon hakkındaki deneyiminizi yazın...",
-                    fillColor: Colors.grey[100],
-                    filled: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("İPTAL")),
-            ElevatedButton(
-              onPressed: salonPuani == 0 ? null : () {
-                Navigator.pop(context);
-                _ustaOyVeYorumPopup(r, salonPuani, salonYorumC.text);
-              }, 
-              child: const Text("SONRAKİ: USTA OYLA")
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _ustaOyVeYorumPopup(Map<String, dynamic> r, int salonP, String salonYorum) {
-    int ustaPuan = 0;
-    final TextEditingController ustaYorumC = TextEditingController();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-          title: Text("${r['ustaIsmi']} Oylayın"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("Ustanın hizmetinden memnun kaldınız mı?"),
-                const SizedBox(height: 20),
-                _yildizSecici((p) => setS(() => ustaPuan = p), ustaPuan),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: ustaYorumC,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: "Usta hakkındaki deneyiminizi yazın...",
-                    fillColor: Colors.grey[100],
-                    filled: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: ustaPuan == 0 ? null : () async {
-                Navigator.pop(context);
-                if (r['id'] > 0) {
-                  await _dbService.yorumKaydet(
-                    ustaIsmi: r['ustaIsmi'], 
-                    salonIsmi: r['berberIsmi'], 
-                    musteriAd: _currentUserName ?? "Kullanıcı", 
-                    puan: ustaPuan.toDouble(), 
-                    yorumMetni: "Salon: $salonYorum\nUsta: ${ustaYorumC.text}"
-                  );
-                  await _dbService.randevuyuTamamlaVeOyla(r['id']);
-                  setState(() {});
-                }
-              }, 
-              child: const Text("OYLAMAYI TAMAMLA")
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _yildizSecici(Function(int) onSelect, int puan) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(5, (index) => IconButton(
-        icon: Icon(
-          index < puan ? Icons.star_rounded : Icons.star_outline_rounded,
-          color: Colors.amber,
-          size: 32,
-        ),
-        onPressed: () => onSelect(index + 1),
-      )),
-    );
-  }
-
-  Widget _randevuKarti(Map<String, dynamic> r, {required bool isAktif}) {
-    final colorScheme = Theme.of(context).colorScheme;
-    bool oylandi = r['oylandi'] == 1;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: isAktif ? colorScheme.primary.withOpacity(0.05) : Colors.grey[50], borderRadius: BorderRadius.circular(16)),
-                child: Icon(isAktif ? Icons.event_available : Icons.history, color: isAktif ? colorScheme.primary : Colors.grey[400]),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(r['berberIsmi'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-                    Text("Usta: ${r['ustaIsmi']}", style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(Icons.calendar_today_rounded, size: 12, color: colorScheme.secondary),
-                        const SizedBox(width: 4),
-                        Text("${r['tarih']} - ${r['saat']}", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.primary)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (!isAktif)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: oylandi ? const Color(0xFF38BDF8).withOpacity(0.1) : Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10)
-                  ),
-                  child: Text(
-                    oylandi ? "Değerlendirildi" : "Tamamlandı",
-                    style: TextStyle(color: oylandi ? const Color(0xFF38BDF8) : Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                ),
-            ],
-          ),
-          if (isAktif) ...[
-            const Divider(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Harita uygulamasına yönlendiriliyorsunuz..."), behavior: SnackBarBehavior.floating));
-                },
-                icon: const Icon(Icons.map_outlined, size: 18),
-                label: const Text("KONUMA GİT"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary.withOpacity(0.05),
-                  foregroundColor: colorScheme.primary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-          ],
-          if (!isAktif) ...[
-            const Divider(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: oylandi ? null : () => _siraliOyVer(r),
-                icon: Icon(oylandi ? Icons.verified_rounded : Icons.star_half_rounded, size: 18),
-                label: Text(oylandi ? "DEĞERLENDİRME TAMAMLANDI" : "DEĞERLENDİR VE YORUM YAP"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: oylandi ? Colors.grey[100] : Colors.amber,
-                  foregroundColor: oylandi ? Colors.grey[400] : Colors.black87,
-                  elevation: oylandi ? 0 : 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-          ]
-        ],
-      ),
-    );
+    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.lock_person_outlined, size: 80, color: Colors.grey), const SizedBox(height: 20), const Text("Randevularınızı görmek için giriş yapın."), const SizedBox(height: 30), ElevatedButton(onPressed: () => Navigator.pushNamed(context, '/giris'), child: const Text("GİRİŞ YAP"))]));
   }
 }
