@@ -4,6 +4,7 @@ import 'randevular_ekrani.dart';
 import 'randevu_detay_ekrani.dart';
 import 'en_iyiler_ekrani.dart';
 import 'salon_giris_ekrani.dart';
+import 'usta_detay_ekrani.dart';
 import '../services/database_service.dart';
 
 class AnaSayfa extends StatefulWidget {
@@ -42,6 +43,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
         musteriTelefon: widget.phoneNumber, 
         userName: widget.userName, 
         seciliSehir: _seciliSehir,
+        onCityTap: _sehirSecimiGoster,
       ),
       EnIyilerEkrani(musteriTelefon: widget.phoneNumber, userName: widget.userName),
       RandevularEkrani(musteriTelefon: widget.phoneNumber),
@@ -52,98 +54,72 @@ class _AnaSayfaState extends State<AnaSayfa> {
   void _sehirSecimiGoster() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      backgroundColor: const Color(0xFFF0F2F5),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
       builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(25),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("Şehir Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 15),
-            _sehirSatiri("İstanbul, Kadıköy"),
-            _sehirSatiri("Ankara, Çankaya"),
-            _sehirSatiri("İzmir, Konak"),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 20),
+            const Text("Şehir Seçin", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            _sehirSatiri("İstanbul, Kadıköy", Icons.location_city),
+            _sehirSatiri("Ankara, Çankaya", Icons.account_balance),
+            _sehirSatiri("İzmir, Konak", Icons.beach_access),
           ],
         ),
       ),
     );
   }
 
-  Widget _sehirSatiri(String sehir) {
-    return ListTile(
-      title: Text(sehir),
-      onTap: () {
-        setState(() {
-          _seciliSehir = sehir;
-          _guncelleSayfalar();
-        });
-        Navigator.pop(context);
-      },
+  Widget _sehirSatiri(String sehir, IconData icon) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+      child: ListTile(
+        leading: Icon(icon, color: const Color(0xFF4E342E)),
+        title: Text(sehir, style: const TextStyle(fontWeight: FontWeight.w500)),
+        onTap: () {
+          setState(() {
+            _seciliSehir = sehir;
+            _guncelleSayfalar();
+          });
+          Navigator.pop(context);
+        },
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
-      appBar: _seciliIndex == 0 ? AppBar(
-        leading: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: theme.primaryColor.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            icon: Icon(Icons.store_rounded, color: theme.primaryColor, size: 20),
-            tooltip: "Salon Girişi",
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalonGirisEkrani())),
-          ),
-        ),
-        title: GestureDetector(
-          onTap: _sehirSecimiGoster,
-          child: Column(
-            children: [
-              Text("Konum", style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w500)),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.location_on, size: 14, color: theme.primaryColor),
-                  const SizedBox(width: 4),
-                  Text(_seciliSehir, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Colors.grey),
-                ],
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-        ],
-      ) : null,
+      backgroundColor: const Color(0xFFF0F2F5),
       body: IndexedStack(
         index: _seciliIndex,
         children: _sayfalar,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _seciliIndex,
-        onTap: (index) {
-          setState(() { _seciliIndex = index; });
-        },
-        selectedItemColor: theme.primaryColor,
-        unselectedItemColor: Colors.grey,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.explore_outlined), activeIcon: Icon(Icons.explore), label: "Keşfet"),
-          BottomNavigationBarItem(icon: Icon(Icons.star_outline_rounded), activeIcon: Icon(Icons.star_rounded), label: "En İyiler"),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today_rounded), label: "Randevular"),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), activeIcon: Icon(Icons.person_rounded), label: "Profil"),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 30)],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _seciliIndex,
+          onTap: (index) => setState(() => _seciliIndex = index),
+          selectedItemColor: const Color(0xFF4E342E),
+          unselectedItemColor: Colors.grey[400],
+          showSelectedLabels: true,
+          elevation: 0,
+          backgroundColor: Colors.white,
+          type: BottomNavigationBarType.fixed,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.explore_outlined), activeIcon: Icon(Icons.explore), label: "Keşfet"),
+            BottomNavigationBarItem(icon: Icon(Icons.stars_outlined), activeIcon: Icon(Icons.stars), label: "En İyiler"),
+            BottomNavigationBarItem(icon: Icon(Icons.calendar_month_outlined), activeIcon: Icon(Icons.calendar_month), label: "Randevular"),
+            BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), activeIcon: Icon(Icons.person), label: "Profil"),
+          ],
+        ),
       ),
     );
   }
@@ -153,228 +129,267 @@ class AnaSayfaIcerik extends StatelessWidget {
   final String? musteriTelefon;
   final String? userName;
   final String seciliSehir;
+  final VoidCallback onCityTap;
 
-  const AnaSayfaIcerik({super.key, this.musteriTelefon, this.userName, required this.seciliSehir});
+  const AnaSayfaIcerik({
+    super.key, 
+    this.musteriTelefon, 
+    this.userName, 
+    required this.seciliSehir,
+    required this.onCityTap
+  });
+
+  static const String defaultSalonImg = "https://images.pexels.com/photos/1319461/pexels-photo-1319461.jpeg";
 
   @override
   Widget build(BuildContext context) {
     final DatabaseService db = DatabaseService();
-    final theme = Theme.of(context);
 
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: db.salonlariGetir(seciliSehir),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text("Hata: ${snapshot.error}"));
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
         final berberler = snapshot.data ?? [];
-        final topBerberler = berberler.where((b) => (double.tryParse(b['puan']?.toString() ?? '0') ?? 0) >= 4.5).toList();
+        final topBerberler = berberler.where((b) => (double.tryParse(b['puan']?.toString() ?? '0') ?? 0) >= 4.0).toList();
+        
+        List<Map<String, dynamic>> ustalar = [];
+        for (var b in berberler) {
+          List uList = b['ustalar'] ?? [];
+          for (var u in uList) {
+            if (u is Map) {
+              Map<String, dynamic> uData = Map<String, dynamic>.from(u);
+              uData['salon'] = b['isim'];
+              ustalar.add(uData);
+            }
+          }
+        }
+        ustalar.sort((a, b) => (double.tryParse(b['puan']?.toString() ?? '0') ?? 0).compareTo(double.tryParse(a['puan']?.toString() ?? '0') ?? 0));
+        final topUstalar = ustalar.take(10).toList();
 
         return CustomScrollView(
+          physics: const BouncingScrollPhysics(),
           slivers: [
-            // Karşılama Metni
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            SliverAppBar(
+              floating: true,
+              backgroundColor: const Color(0xFFF0F2F5),
+              elevation: 0,
+              toolbarHeight: 100,
+              title: Padding(
+                padding: const EdgeInsets.only(top: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "Merhaba, ${userName?.split(' ')[0] ?? 'Misafir'} 👋",
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    const Text(
-                      "Bugün tarzını yenilemeye ne dersin?",
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                    ),
+                    Text("Merhaba, ${userName?.split(' ')[0] ?? 'Misafir'} 👋", 
+                      style: TextStyle(color: Colors.grey[600], fontSize: 16, fontWeight: FontWeight.w400)),
+                    const Text("Bugün tarzını yenile!", 
+                      style: TextStyle(color: Color(0xFF4E342E), fontSize: 24, fontWeight: FontWeight.bold)),
                   ],
+                ),
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 20, right: 10),
+                  child: IconButton(
+                    icon: const CircleAvatar(backgroundColor: Colors.white, child: Icon(Icons.storefront, color: Color(0xFF4E342E), size: 18)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalonGirisEkrani())),
+                  ),
+                ),
+              ],
+            ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+                child: GestureDetector(
+                  onTap: onCityTap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on, color: Color(0xFF4E342E), size: 20),
+                        const SizedBox(width: 12),
+                        Text(seciliSehir, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const Spacer(),
+                        const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
 
-            // Top Salonlar Slider
+            // ÖNE ÇIKAN SALONLAR
             if (topBerberler.isNotEmpty) ...[
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-                  child: Text("Öne Çıkan Salonlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                ),
-              ),
+              const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(25, 30, 25, 15), child: Text("Öne Çıkan Salonlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 220,
+                  height: 250,
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     scrollDirection: Axis.horizontal,
                     itemCount: topBerberler.length,
-                    itemBuilder: (context, index) => _topBerberKarti(context, topBerberler[index]),
+                    itemBuilder: (context, index) => _TopSalonKarti(berber: topBerberler[index], tel: musteriTelefon, ad: userName),
                   ),
                 ),
               ),
             ],
 
-            // Tüm Salonlar Başlığı
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 30, 20, 15),
-                child: Text("Yakınındaki Tüm Salonlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            // YILDIZ USTALAR
+            if (topUstalar.isNotEmpty) ...[
+              const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(25, 35, 25, 10), child: Text("Yıldız Ustalar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 110,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: topUstalar.length,
+                    itemBuilder: (context, index) => _UstaAvatarKarti(usta: topUstalar[index]),
+                  ),
+                ),
+              ),
+            ],
+
+            const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(25, 35, 25, 15), child: Text("Yakındaki Tüm Salonlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
+
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 25),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _NormalSalonKarti(berber: berberler[index], tel: musteriTelefon, ad: userName),
+                  childCount: berberler.length,
+                ),
               ),
             ),
-
-            // Tüm Salonlar Listesi
-            if (berberler.isEmpty)
-              SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.storefront_outlined, size: 80, color: Colors.grey),
-                      const SizedBox(height: 20),
-                      Text("$seciliSehir için henüz bir salon eklenmedi."),
-                    ],
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => _berberKarti(context, berberler[index]),
-                    childCount: berberler.length,
-                  ),
-                ),
-              ),
-            const SliverToBoxAdapter(child: SizedBox(height: 30)),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         );
       },
     );
   }
 
-  Widget _topBerberKarti(BuildContext context, Map<String, dynamic> berber) {
-    final theme = Theme.of(context);
+  static Widget _resimKontrol(String? url) {
+    if (url == null || url.isEmpty || !url.startsWith('http')) url = defaultSalonImg;
+    return Image.network(url, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Image.network(defaultSalonImg, fit: BoxFit.cover));
+  }
+}
+
+class _UstaAvatarKarti extends StatelessWidget {
+  final Map<String, dynamic> usta;
+  const _UstaAvatarKarti({required this.usta});
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RandevuDetayEkrani(berber: berber, musteriTelefon: musteriTelefon, userName: userName))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => UstaDetayEkrani(usta: usta, salonIsmi: usta['salon'] ?? ""))),
       child: Container(
-        width: 280,
-        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 5))],
-        ),
+        width: 80,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-                    child: Image.network(
-                      berber['resim'] ?? 'https://images.pexels.com/photos/3993323/pexels-photo-3993323.jpeg',
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (c, e, s) => Container(color: Colors.grey[100], child: const Icon(Icons.image_not_supported)),
-                    ),
-                  ),
-                  Positioned(
-                    top: 15,
-                    right: 15,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
-                          Text(" ${berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 35,
+                  backgroundImage: NetworkImage(usta['resim'] ?? 'https://i.pravatar.cc/150?u=${usta['isim']}'),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                  child: const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(berber['isim'] ?? 'İsimsiz Salon', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on, size: 14, color: theme.primaryColor),
-                      const SizedBox(width: 4),
-                      Text(berber['sehir'] ?? "", style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 8),
+            Text(usta['isim']?.split(' ')[0] ?? "", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _berberKarti(BuildContext context, Map<String, dynamic> berber) {
-    final theme = Theme.of(context);
+class _TopSalonKarti extends StatelessWidget {
+  final Map<String, dynamic> berber;
+  final String? tel;
+  final String? ad;
+  const _TopSalonKarti({required this.berber, this.tel, this.ad});
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RandevuDetayEkrani(berber: berber, musteriTelefon: musteriTelefon, userName: userName))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RandevuDetayEkrani(berber: berber, musteriTelefon: tel, userName: ad))),
+      child: Container(
+        width: 260,
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 20, offset: const Offset(0, 10))]),
+        child: Column(
+          children: [
+            Expanded(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(30)), child: AnaSayfaIcerik._resimKontrol(berber['resim']))),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: Text(berber['isim'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
+                      Text(" ${berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(berber['sehir'] ?? "", style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                ],
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NormalSalonKarti extends StatelessWidget {
+  final Map<String, dynamic> berber;
+  final String? tel;
+  final String? ad;
+  const _NormalSalonKarti({required this.berber, this.tel, this.ad});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RandevuDetayEkrani(berber: berber, musteriTelefon: tel, userName: ad))),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white, 
-          borderRadius: BorderRadius.circular(22), 
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))]
-        ),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 5))]),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: Image.network(
-                berber['resim'] ?? 'https://images.pexels.com/photos/3993323/pexels-photo-3993323.jpeg', 
-                width: 90, height: 90, fit: BoxFit.cover,
-                errorBuilder: (c,e,s) => Container(width: 90, height: 90, color: Colors.grey[100], child: const Icon(Icons.image_not_supported)),
-              ),
-            ),
-            const SizedBox(width: 16),
+            ClipRRect(borderRadius: BorderRadius.circular(15), child: SizedBox(width: 80, height: 80, child: AnaSayfaIcerik._resimKontrol(berber['resim']))),
+            const SizedBox(width: 15),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(berber['isim'] ?? 'İsimsiz Salon', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
-                        Text(" ${berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amber)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 6),
+                  Text(berber['isim'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 12, color: theme.primaryColor.withOpacity(0.5)),
-                      const SizedBox(width: 4),
-                      Text(berber['sehir']?.split(',')[0] ?? "", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                      Text(" ${berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      const SizedBox(width: 10),
+                      Text(berber['sehir']?.split(',')[0] ?? "", style: TextStyle(color: Colors.grey[400], fontSize: 12)),
                     ],
                   ),
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.05), shape: BoxShape.circle),
-              child: Icon(Icons.chevron_right_rounded, color: theme.primaryColor),
-            ),
+            Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey[300], size: 16),
           ],
         ),
       ),

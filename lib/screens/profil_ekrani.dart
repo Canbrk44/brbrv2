@@ -98,9 +98,43 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Profil")),
-      body: SingleChildScrollView(
-        child: widget.isGuest ? _ziyaretciGorunumu(context) : _profilGorunumu(context),
+      backgroundColor: const Color(0xFFF5F7F8),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // WOW HEADER - PROFİL
+          SliverAppBar(
+            expandedHeight: 200.0,
+            pinned: true,
+            stretch: true,
+            backgroundColor: const Color(0xFF4E342E),
+            flexibleSpace: FlexibleSpaceBar(
+              title: const Text("Profilim", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    'https://images.pexels.com/photos/1319461/pexels-photo-1319461.jpeg',
+                    fit: BoxFit.cover,
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black87],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          SliverToBoxAdapter(
+            child: widget.isGuest ? _ziyaretciGorunumu(context) : _profilGorunumu(context),
+          ),
+        ],
       ),
     );
   }
@@ -111,7 +145,7 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
       child: Column(
         children: [
           const SizedBox(height: 50),
-          Icon(Icons.account_circle_outlined, size: 100, color: Colors.grey[400]),
+          Icon(Icons.account_circle_outlined, size: 100, color: Colors.grey[300]),
           const SizedBox(height: 20),
           const Text("Profilinizi yönetmek için giriş yapın", textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
           const SizedBox(height: 30),
@@ -123,36 +157,39 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
 
   Widget _profilGorunumu(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
-    return Column(
-      children: [
-        const SizedBox(height: 30),
-        Center(
-          child: Stack(
-            children: [
-              CircleAvatar(radius: 55, backgroundColor: primaryColor.withOpacity(0.1), child: Icon(Icons.person, size: 60, color: primaryColor)),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
-                  child: const Icon(Icons.edit, size: 18, color: Colors.white),
+    return Padding(
+      padding: const EdgeInsets.all(25.0),
+      child: Column(
+        children: [
+          Center(
+            child: Stack(
+              children: [
+                CircleAvatar(radius: 55, backgroundColor: primaryColor.withOpacity(0.1), child: Icon(Icons.person, size: 60, color: primaryColor)),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
+                    child: const Icon(Icons.edit, size: 18, color: Colors.white),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-        Text(widget.userName ?? "Kullanıcı", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        Text(widget.phoneNumber ?? "+90 5xx xxx xx xx", style: TextStyle(color: Colors.grey[600])),
-        const SizedBox(height: 40),
-        _profilMenusu(Icons.person_outline, "Bilgilerimi Düzenle", () {}),
-        _profilMenusu(Icons.calendar_month_outlined, "Randevularım", () {}),
-        _profilMenusu(Icons.notifications_none_outlined, "Bildirim Ayarları", () {}),
-        _profilMenusu(Icons.help_outline, "Yardım ve Destek", () {}),
-        const SizedBox(height: 20),
-        _profilMenusu(Icons.logout, "Çıkış Yap", () => _cikisYap(context), renk: Colors.red),
-      ],
+          const SizedBox(height: 20),
+          Text(widget.userName ?? "Kullanıcı", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          Text(widget.phoneNumber ?? "+90 5xx xxx xx xx", style: TextStyle(color: Colors.grey[600])),
+          const SizedBox(height: 40),
+          _profilMenusu(Icons.person_outline, "Bilgilerimi Düzenle", () {}),
+          _profilMenusu(Icons.calendar_month_outlined, "Randevularım", () {}),
+          _profilMenusu(Icons.notifications_none_outlined, "Bildirim Ayarları", () {}),
+          _profilMenusu(Icons.help_outline, "Yardım ve Destek", () {}),
+          const SizedBox(height: 20),
+          _profilMenusu(Icons.logout, "Çıkış Yap", () => _cikisYap(context), renk: Colors.red),
+          const SizedBox(height: 100),
+        ],
+      ),
     );
   }
 
@@ -171,11 +208,15 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
   }
 
   Widget _profilMenusu(IconData ikon, String baslik, VoidCallback onTap, {Color? renk}) {
-    return ListTile(
-      leading: Icon(ikon, color: renk ?? Colors.black87),
-      title: Text(baslik, style: TextStyle(color: renk ?? Colors.black87, fontWeight: FontWeight.w500)),
-      trailing: const Icon(Icons.chevron_right, size: 20),
-      onTap: onTap,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
+      child: ListTile(
+        leading: Icon(ikon, color: renk ?? Colors.black87),
+        title: Text(baslik, style: TextStyle(color: renk ?? Colors.black87, fontWeight: FontWeight.w500)),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+        onTap: onTap,
+      ),
     );
   }
 }

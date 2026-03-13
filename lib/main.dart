@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:intl/date_symbol_data_local.dart'; // Yerelleştirme için eklendi
+import 'package:intl/date_symbol_data_local.dart';
 import 'screens/giris_ekrani.dart';
 import 'screens/ana_sayfa.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Türkçe tarih formatlarını hazırlıyoruz
   await initializeDateFormatting('tr_TR', null);
 
   await Firebase.initializeApp(
@@ -53,7 +51,6 @@ class BerberApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'MyRandevum',
-      // Uygulamanın varsayılan dilini Türkçe yapalım
       locale: const Locale('tr', 'TR'),
       theme: ThemeData(
         useMaterial3: true,
@@ -63,9 +60,11 @@ class BerberApp extends StatelessWidget {
           primary: const Color(0xFF4E342E),
           secondary: const Color(0xFF8D6E63),
           surface: Colors.white,
-          background: const Color(0xFFFDF5E6),
+          // Modern "Cool Gray" Arka Plan
+          background: const Color(0xFFF5F7F8),
         ),
-        scaffoldBackgroundColor: const Color(0xFFFDF5E6),
+        // Global Arka Plan Rengi
+        scaffoldBackgroundColor: const Color(0xFFF5F7F8),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           foregroundColor: Color(0xFF4E342E),
