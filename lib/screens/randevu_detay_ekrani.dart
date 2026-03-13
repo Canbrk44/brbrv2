@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 import '../services/database_service.dart';
 import 'sms_onay_ekrani.dart';
 
@@ -18,31 +19,57 @@ class RandevuDetayEkrani extends StatefulWidget {
 
 class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
   DateTime? seciliTarih;
-  String? seciliUsta;
+  Map<String, dynamic>? seciliUstaData;
   String? seciliSaat;
-  final List<String> seciliKisiTurleri = ["Yetişkin"]; // Varsayılan Yetişkin seçili
   final List<String> seciliHizmetler = [];
   int toplamMaliyet = 0;
   final DatabaseService _dbService = DatabaseService();
 
-  late List<Map<String, dynamic>> ustalar;
-  late List<Map<String, dynamic>> fiyatListesi;
-  late List<String> galeri;
+  List<Map<String, dynamic>> ustalar = [];
+  List<Map<String, dynamic>> fiyatListesi = [];
+  List<String> galeri = [];
 
   @override
   void initState() {
     super.initState();
-    // API'den gelen verileri kullanıyoruz. Eğer yoksa boş liste atıyoruz.
-    ustalar = List<Map<String, dynamic>>.from(widget.berber['ustalar'] ?? []);
-    fiyatListesi = List<Map<String, dynamic>>.from(widget.berber['fiyatListesi'] ?? []);
-    galeri = List<String>.from(widget.berber['galeri'] ?? []);
+    _verileriHazirla();
   }
 
-  final List<String> saatler = List.generate(25, (i) {
-    int hour = 9 + (i ~/ 2);
-    int minute = (i % 2) * 30;
-    return "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
-  });
+  void _verileriHazirla() {
+    try {
+      // Ustaları güvenli bir şekilde çekelim
+      var ustalarVerisi = widget.berber['ustalar'];
+      if (ustalarVerisi is List) {
+        ustalar = ustalarVerisi.map((e) {
+          if (e is Map) return Map<String, dynamic>.from(e);
+          return {"isim": e.toString(), "resim": null}; // Eğer yanlışlıkla düz yazı girildiyse objeye çevir
+        }).toList();
+      }
+
+      // Hizmetleri güvenli bir şekilde çekelim
+      var hizmetVerisi = widget.berber['hizmetler'] ?? widget.berber['fiyatListesi'];
+      if (hizmetVerisi is List) {
+        fiyatListesi = hizmetVerisi.map((e) {
+          if (e is Map) return Map<String, dynamic>.from(e);
+          return {"isim": e.toString(), "fiyat": 0};
+        }).toList();
+      }
+
+      // Galeriyi güvenli çekelim
+      var galeriVerisi = widget.berber['galeri'];
+      if (galeriVerisi is List) {
+        galeri = List<String>.from(galeriVerisi);
+      }
+    } catch (e) {
+      debugPrint("Veri dönüştürme hatası: $e");
+    }
+  }
+
+  final List<String> saatler = [
+    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", 
+    "12:00", "13:00", "13:30", "14:00", "14:30", "15:00", 
+    "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"
+  ];
 
   void _hizmetGuncelle(String hizmet, int fiyat) {
     setState(() {
@@ -56,43 +83,12 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
     });
   }
 
-  void _kisiTuruGuncelle(String turu) {
-    setState(() {
-      if (seciliKisiTurleri.contains(turu)) {
-        if (seciliKisiTurleri.length > 1) { // En az biri seçili kalmalı
-          seciliKisiTurleri.remove(turu);
-        }
-      } else {
-        if (seciliKisiTurleri.length < 2) { // Maksimum 2 seçim
-          seciliKisiTurleri.add(turu);
-        } else {
-          _uyariGoster("En fazla 2 kişi seçebilirsiniz.");
-        }
-      }
-    });
-  }
-
-  Future<void> _haritadaGoster() async {
-    // Koordinatlar berber verisinden gelebilir veya varsayılan kalabilir
-    final double lat = widget.berber['lat'] ?? 40.9882;
-    final double lng = widget.berber['lng'] ?? 29.0284;
-    final Uri googleMapsUrl = Uri.parse("google.navigation:q=$lat,$lng&mode=d");
-    final Uri appleMapsUrl = Uri.parse("https://maps.apple.com/?q=$lat,$lng");
-
-    try {
-      if (await canLaunchUrl(googleMapsUrl)) {
-        await launchUrl(googleMapsUrl);
-      } else if (await canLaunchUrl(appleMapsUrl)) {
-        await launchUrl(appleMapsUrl);
-      } else {
-        _uyariGoster("Navigasyon uygulamasi bulunamadi.");
-      }
-    } catch (e) {
-      _uyariGoster("Harita acilirken bir hata olustu.");
-    }
-  }
-
   void _randevuSureciniBaslat() async {
+    if (seciliUstaData == null || seciliTarih == null || seciliSaat == null) {
+      _uyariGoster("Lütfen usta, tarih ve saat seçin.");
+      return;
+    }
+
     if (widget.musteriTelefon == null || widget.userName == null) {
       _misafirBilgiPopup((yeniIsim, yeniTlf) => _devamEt(yeniTlf, yeniIsim));
     } else {
@@ -102,9 +98,9 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
 
   void _devamEt(String tlf, String isim) async {
     int sayi = await _dbService.aktifRandevuSayisi(tlf);
-    if (sayi >= 2) {
+    if (sayi >= 3) {
       if (!mounted) return;
-      _uyariGoster("Zaten 2 aktif randevunuz bulunuyor. Sinir doldu.");
+      _uyariGoster("En fazla 3 aktif randevunuz olabilir.");
       return;
     }
 
@@ -114,12 +110,12 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
       MaterialPageRoute(
         builder: (context) => SmsOnayEkrani(
           berberIsmi: widget.berber['isim'], 
-          ustaIsmi: seciliUsta!, 
-          tarih: "${seciliTarih!.day}/${seciliTarih!.month}/${seciliTarih!.year}", 
+          ustaIsmi: seciliUstaData!['isim'], 
+          tarih: DateFormat('dd.MM.yyyy').format(seciliTarih!), 
           saat: seciliSaat!,
           musteriTelefon: tlf,
           userName: isim,
-          kisiTuru: seciliKisiTurleri.join(" + "),
+          kisiTuru: "Yetişkin",
         )
       )
     );
@@ -130,13 +126,12 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
       SnackBar(
         content: Text(mesaj),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: const Color(0xFF4E342E),
       ),
     );
   }
 
-  void _misafirBilgiPopup(Function(String, String) Onay) {
+  void _misafirBilgiPopup(Function(String, String) onay) {
     final nC = TextEditingController();
     final pC = TextEditingController();
     showModalBottomSheet(
@@ -145,27 +140,24 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 25, right: 25, top: 25),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20, left: 25, right: 25, top: 25),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+            const Text("Randevu İçin Bilgileriniz", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-            const Text("Randevu Icin Bilgileriniz", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            TextField(controller: nC, decoration: const InputDecoration(hintText: "Adiniz Soyadiniz", prefixIcon: Icon(Icons.person))),
+            TextField(controller: nC, decoration: const InputDecoration(hintText: "Adınız Soyadınız", prefixIcon: Icon(Icons.person))),
             const SizedBox(height: 15),
-            TextField(controller: pC, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)], decoration: const InputDecoration(hintText: "Telefon Numaraniz (05...)", prefixIcon: Icon(Icons.phone))),
+            TextField(controller: pC, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)], decoration: const InputDecoration(hintText: "Telefon Numaranız (05...)", prefixIcon: Icon(Icons.phone))),
             const SizedBox(height: 25),
             ElevatedButton(onPressed: () {
-              if (nC.text.isNotEmpty && pC.text.length == 11 && pC.text.startsWith('0')) {
+              if (nC.text.isNotEmpty && pC.text.length == 11) {
                 Navigator.pop(context);
-                Onay(nC.text, pC.text);
+                onay(nC.text, pC.text);
               } else {
-                _uyariGoster("Lutfen bilgileri dogru girin.");
+                _uyariGoster("Lütfen bilgileri doğru girin.");
               }
             }, child: const Text("DEVAM ET")),
-            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -174,272 +166,284 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     
-    String enIyiUstaIsmi = "";
-    if (ustalar.isNotEmpty) {
-      final enIyi = ustalar.reduce((a, b) => 
-          double.parse(a['puan']?.toString() ?? "0") > double.parse(b['puan']?.toString() ?? "0") ? a : b);
-      enIyiUstaIsmi = enIyi['isim'] ?? "";
-    }
-
-    final seciliUstaData = seciliUsta != null ? ustalar.firstWhere((u) => u['isim'] == seciliUsta) : null;
-
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 250.0, 
-            pinned: true, 
+            expandedHeight: 280.0, 
+            pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(widget.berber['isim'] ?? 'Salon Detay', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, shadows: [Shadow(blurRadius: 10, color: Colors.black54)])), 
               background: Stack(
                 fit: StackFit.expand, 
                 children: [
                   Image.network(
                     widget.berber['resim'] ?? 'https://images.pexels.com/photos/3993323/pexels-photo-3993323.jpeg', 
-                    fit: BoxFit.cover, 
-                    errorBuilder: (c,e,s) => Container(color: Colors.grey[200])
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) => Container(color: Colors.grey[300]),
                   ), 
                   const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black87, Colors.transparent])))
                 ]
               )
             )
           ),
-          SliverPadding(
-            padding: const EdgeInsets.all(20.0),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                if (galeri.isNotEmpty) ...[
-                  const Text("Galeri", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 160,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: galeri.length,
-                      itemBuilder: (context, index) => Container(
-                        margin: const EdgeInsets.only(right: 12),
-                        width: 240,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          image: DecorationImage(image: NetworkImage(galeri[index]), fit: BoxFit.cover),
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.berber['isim'] ?? 'İsimsiz Salon', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text(widget.berber['sehir'] ?? "", style: const TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(15)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.star_rounded, color: Colors.amber),
+                            Text(" ${widget.berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 30),
+                  
+                  if (galeri.isNotEmpty) ...[
+                    const Text("Salon Galerisi", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 120,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: galeri.length,
+                        itemBuilder: (context, index) => Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          width: 180,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                            image: DecorationImage(image: NetworkImage(galeri[index]), fit: BoxFit.cover),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 35),
-                ],
-                
-                if (fiyatListesi.isNotEmpty) ...[
-                  const Text("Hizmet Secin", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 30),
+                  ],
+
+                  const Text("Hizmet Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20)],
-                    ),
-                    child: Column(
-                      children: fiyatListesi.map((item) {
-                        final isSelected = seciliHizmetler.contains(item['hizmet']);
-                        return CheckboxListTile(
-                          value: isSelected,
-                          onChanged: (bool? value) => _hizmetGuncelle(item['hizmet'], (item['fiyat'] as num).toInt()),
-                          title: Text(item['hizmet'], style: const TextStyle(fontWeight: FontWeight.w500)),
-                          secondary: Text("${item['fiyat']} TL", style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.secondary)),
-                          activeColor: colorScheme.primary,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                          checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 35),
-                ],
-
-                if (ustalar.isNotEmpty) ...[
-                  const Text("Usta Secin", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 15),
-                  SizedBox(
-                    height: 150,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: ustalar.length,
-                      itemBuilder: (context, index) {
-                        bool isSelected = seciliUsta == ustalar[index]['isim'];
-                        bool isBest = ustalar[index]['isim'] == enIyiUstaIsmi;
-                        return GestureDetector(
-                          onTap: () => setState(() {
-                            seciliUsta = ustalar[index]['isim'];
-                            seciliTarih = null;
-                            seciliSaat = null;
-                          }),
-                          child: Container(
-                            width: 100,
-                            margin: const EdgeInsets.only(right: 15),
-                            child: Column(
-                              children: [
-                                Stack(clipBehavior: Clip.none, children: [
-                                  AnimatedContainer(duration: const Duration(milliseconds: 300), padding: const EdgeInsets.all(3), decoration: BoxDecoration(shape: BoxShape.circle, border: isSelected ? Border.all(color: colorScheme.primary, width: 3) : (isBest ? Border.all(color: Colors.amber, width: 2) : Border.all(color: Colors.transparent, width: 2))), child: CircleAvatar(radius: 38, backgroundImage: NetworkImage(ustalar[index]['resim'] ?? 'https://i.pravatar.cc/150?u=1'))),
-                                  if (isBest) const Positioned(top: -10, left: 0, right: 0, child: Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 32)),
-                                  Positioned(bottom: 0, left: 0, right: 0, child: Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white, width: 1.5)), child: Text("⭐ ${ustalar[index]['puan']}", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))))),
-                                ]),
-                                const SizedBox(height: 10),
-                                Text(ustalar[index]['isim']?.split(' ')[0] ?? 'Usta', style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500)),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ] else const Text("Bu salonda henüz kayıtlı usta bulunmuyor."),
-
-                // Usta seçildikten sonra gelecek kısımlar
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 400),
-                  curve: Curves.easeInOut,
-                  child: seciliUsta != null 
-                  ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 35),
-                      const Text("Kim icin randevu aliniyor?", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 15),
-                      Row(
-                        children: [
-                          {"turu": "Yetişkin", "icon": Icons.person},
-                          {"turu": "Çocuk", "icon": Icons.child_care}
-                        ].map((item) {
-                          String turu = item['turu'] as String;
-                          IconData icon = item['icon'] as IconData;
-                          bool isSelected = seciliKisiTurleri.contains(turu);
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 15),
-                            child: FilterChip(
-                              avatar: Icon(icon, size: 18, color: isSelected ? Colors.white : Colors.black54),
-                              label: Text(turu),
-                              selected: isSelected,
-                              onSelected: (val) => _kisiTuruGuncelle(turu),
-                              selectedColor: colorScheme.primary,
-                              labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-
-                      const SizedBox(height: 35),
-                      Row(children: [const Text("Tarih Secin", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const Spacer(), _bilgiIkonu(Colors.green, "Bos"), const SizedBox(width: 10), _bilgiIkonu(Colors.red, "Dolu")]),
-                      const SizedBox(height: 15),
-                      _ozelTakvim(colorScheme.primary, Set<int>.from(seciliUstaData!['doluGunler'] ?? [])),
-
-                      if (seciliTarih != null) ...[
-                        const SizedBox(height: 35),
-                        const Text("Saat Secin", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 15),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: saatler.map((saatText) {
-                            bool isDolu = (seciliUstaData['doluSaatler'] ?? []).contains(saatText);
-                            bool isSelected = seciliSaat == saatText;
-                            return GestureDetector(
-                              onTap: () {
-                                if (isDolu) _uyariGoster("Bu saat dolu.");
-                                else setState(() => seciliSaat = saatText);
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200), 
-                                width: (MediaQuery.of(context).size.width - 64) / 4, 
-                                padding: const EdgeInsets.symmetric(vertical: 14), 
-                                decoration: BoxDecoration(
-                                  color: isDolu ? Colors.red.withOpacity(0.05) : (isSelected ? colorScheme.primary : Colors.white), 
-                                  borderRadius: BorderRadius.circular(16), 
-                                  border: Border.all(color: isDolu ? Colors.red.withOpacity(0.2) : (isSelected ? colorScheme.primary : Colors.grey[200]!), width: 1.5), 
-                                  boxShadow: isSelected ? [BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))] : []
-                                ), 
-                                child: Center(child: Text(saatText, style: TextStyle(color: isSelected ? Colors.white : (isDolu ? Colors.red : Colors.black87), fontWeight: FontWeight.bold)))
-                              ),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey[200]!)),
+                    child: fiyatListesi.isEmpty 
+                      ? const Padding(padding: EdgeInsets.all(20), child: Text("Hizmet listesi boş."))
+                      : Column(
+                          children: fiyatListesi.map((item) {
+                            final name = item['isim'] ?? item['hizmet'] ?? "İsimsiz Hizmet";
+                            final isSelected = seciliHizmetler.contains(name);
+                            final price = (item['fiyat'] as num?)?.toInt() ?? 0;
+                            return CheckboxListTile(
+                              value: isSelected,
+                              onChanged: (val) => _hizmetGuncelle(name, price),
+                              title: Text(name),
+                              secondary: Text("$price TL", style: TextStyle(fontWeight: FontWeight.bold, color: theme.primaryColor)),
+                              activeColor: theme.primaryColor,
+                              checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                             );
                           }).toList(),
                         ),
-                      ]
-                    ],
-                  ) : const SizedBox.shrink(),
-                ),
-                const SizedBox(height: 120),
-              ]),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  const Text("Usta Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 15),
+                  ustalar.isEmpty 
+                    ? const Text("Kayıtlı usta bulunamadı.")
+                    : SizedBox(
+                        height: 130,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: ustalar.length,
+                          itemBuilder: (context, index) {
+                            final usta = ustalar[index];
+                            bool isSelected = seciliUstaData?['isim'] == usta['isim'];
+                            return GestureDetector(
+                              onTap: () => setState(() {
+                                seciliUstaData = usta;
+                                seciliTarih = null;
+                                seciliSaat = null;
+                              }),
+                              child: Container(
+                                width: 90,
+                                margin: const EdgeInsets.only(right: 15),
+                                child: Column(
+                                  children: [
+                                    AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: isSelected ? theme.primaryColor : Colors.transparent, width: 3),
+                                      ),
+                                      child: CircleAvatar(
+                                        radius: 35,
+                                        backgroundImage: NetworkImage(usta['resim'] ?? 'https://i.pravatar.cc/150?u=${usta['isim']}'),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(usta['isim']?.split(' ')[0] ?? 'Usta', 
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
+                                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+
+                  if (seciliUstaData != null) ...[
+                    const SizedBox(height: 20),
+                    const Text("Tarih Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
+                    _takvimOlustur(theme),
+                  ],
+
+                  if (seciliTarih != null) ...[
+                    const SizedBox(height: 30),
+                    const Text("Saat Seçin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: saatler.map((saat) {
+                        bool isDolu = (seciliUstaData!['doluSaatler'] ?? []).contains(saat);
+                        bool isSelected = seciliSaat == saat;
+                        return GestureDetector(
+                          onTap: () {
+                            if (isDolu) _uyariGoster("Bu saat dolu.");
+                            else setState(() => seciliSaat = saat);
+                          },
+                          child: Container(
+                            width: (MediaQuery.of(context).size.width - 70) / 4,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isSelected ? theme.primaryColor : (isDolu ? Colors.grey[200] : Colors.white),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isSelected ? theme.primaryColor : Colors.grey[300]!),
+                            ),
+                            child: Center(
+                              child: Text(saat, style: TextStyle(
+                                color: isSelected ? Colors.white : (isDolu ? Colors.grey : Colors.black87),
+                                fontWeight: FontWeight.bold, fontSize: 13
+                              )),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 120),
+                ],
+              ),
             ),
           ),
         ],
       ),
       bottomSheet: seciliSaat != null ? Container(
-        padding: const EdgeInsets.all(25),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: const BorderRadius.vertical(top: Radius.circular(30)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, -5))]),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5))],
+        ),
         child: Row(
           children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Toplam Tutar", style: TextStyle(color: Colors.grey, fontSize: 13)),
-                Text("$toplamMaliyet TL", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              ],
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Toplam", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text("$toplamMaliyet TL", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
-            const SizedBox(width: 20),
-            Expanded(child: ElevatedButton(onPressed: _randevuSureciniBaslat, child: const Text("RANDEVU AL"))),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: _randevuSureciniBaslat,
+                child: const Text("RANDEVUYU TAMAMLA"),
+              ),
+            ),
           ],
         ),
       ) : null,
     );
   }
 
-  Widget _bilgiIkonu(Color color, String text) {
-    return Row(children: [Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)), const SizedBox(width: 4), Text(text, style: const TextStyle(fontSize: 12, color: Colors.grey))]);
-  }
+  Widget _takvimOlustur(ThemeData theme) {
+    return SizedBox(
+      height: 90,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: 14, 
+        itemBuilder: (context, index) {
+          DateTime date = DateTime.now().add(Duration(days: index));
+          bool isSelected = seciliTarih?.day == date.day && seciliTarih?.month == date.month;
+          bool isWeekend = date.weekday == DateTime.sunday;
 
-  Widget _ozelTakvim(Color primary, Set<int> doluGunler) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.grey[100]!)),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text("Ocak 2025", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Row(children: [const Icon(Icons.chevron_left, color: Colors.grey), const SizedBox(width: 10), const Icon(Icons.chevron_right, color: Colors.grey)]),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((d) => SizedBox(width: 35, child: Center(child: Text(d, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))))).toList()),
-          const SizedBox(height: 10),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisSpacing: 5, crossAxisSpacing: 5),
-            itemCount: 31,
-            itemBuilder: (context, index) {
-              int gun = index + 1;
-              bool isDolu = doluGunler.contains(gun);
-              bool isSelected = seciliTarih?.day == gun;
-              return GestureDetector(
-                onTap: () {
-                  if (isDolu) _uyariGoster("Bu gün dolu.");
-                  else setState(() { seciliTarih = DateTime(2025, 1, gun); seciliSaat = null; });
-                },
-                child: Container(
-                  decoration: BoxDecoration(color: isSelected ? primary : (isDolu ? Colors.red.withOpacity(0.1) : Colors.transparent), shape: BoxShape.circle),
-                  child: Center(child: Text("$gun", style: TextStyle(color: isSelected ? Colors.white : (isDolu ? Colors.red : Colors.black87), fontWeight: isSelected ? FontWeight.bold : FontWeight.normal))),
-                ),
-              );
+          return GestureDetector(
+            onTap: () {
+              if (isWeekend) {
+                _uyariGoster("Pazar günleri kapalıyız.");
+              } else {
+                setState(() {
+                  seciliTarih = date;
+                  seciliSaat = null;
+                });
+              }
             },
-          ),
-        ],
+            child: Container(
+              width: 65,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: isSelected ? theme.primaryColor : Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: isSelected ? theme.primaryColor : Colors.grey[200]!),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(DateFormat('E', 'tr_TR').format(date), style: TextStyle(color: isSelected ? Colors.white70 : Colors.grey, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Text(date.day.toString(), style: TextStyle(color: isSelected ? Colors.white : Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

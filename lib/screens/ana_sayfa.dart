@@ -84,16 +84,17 @@ class _AnaSayfaState extends State<AnaSayfa> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: _seciliIndex == 0 ? AppBar(
         leading: Container(
           margin: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A).withOpacity(0.05),
+            color: theme.primaryColor.withOpacity(0.05),
             borderRadius: BorderRadius.circular(12),
           ),
           child: IconButton(
-            icon: const Icon(Icons.store_rounded, color: Color(0xFF0F172A), size: 20),
+            icon: Icon(Icons.store_rounded, color: theme.primaryColor, size: 20),
             tooltip: "Salon Girişi",
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalonGirisEkrani())),
           ),
@@ -102,19 +103,26 @@ class _AnaSayfaState extends State<AnaSayfa> {
           onTap: _sehirSecimiGoster,
           child: Column(
             children: [
-              Text("Konum", style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              Text("Konum", style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w500)),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.location_on, size: 14, color: Colors.redAccent),
+                  Icon(Icons.location_on, size: 14, color: theme.primaryColor),
                   const SizedBox(width: 4),
-                  Text(_seciliSehir, style: const TextStyle(fontSize: 16)),
+                  Text(_seciliSehir, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                   const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Colors.grey),
                 ],
               ),
             ],
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_none_rounded),
+            onPressed: () {},
+          ),
+          const SizedBox(width: 8),
+        ],
       ) : null,
       body: IndexedStack(
         index: _seciliIndex,
@@ -125,14 +133,16 @@ class _AnaSayfaState extends State<AnaSayfa> {
         onTap: (index) {
           setState(() { _seciliIndex = index; });
         },
-        selectedItemColor: const Color(0xFF0F172A),
+        selectedItemColor: theme.primaryColor,
         unselectedItemColor: Colors.grey,
+        showSelectedLabels: true,
+        showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: "Ana Sayfa"),
-          BottomNavigationBarItem(icon: Icon(Icons.workspace_premium_rounded), label: "En İyiler"),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today_rounded), label: "Randevular"),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: "Profil"),
+          BottomNavigationBarItem(icon: Icon(Icons.explore_outlined), activeIcon: Icon(Icons.explore), label: "Keşfet"),
+          BottomNavigationBarItem(icon: Icon(Icons.star_outline_rounded), activeIcon: Icon(Icons.star_rounded), label: "En İyiler"),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today_rounded), label: "Randevular"),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), activeIcon: Icon(Icons.person_rounded), label: "Profil"),
         ],
       ),
     );
@@ -149,6 +159,7 @@ class AnaSayfaIcerik extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final DatabaseService db = DatabaseService();
+    final theme = Theme.of(context);
 
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: db.salonlariGetir(seciliSehir),
@@ -157,47 +168,177 @@ class AnaSayfaIcerik extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
         final berberler = snapshot.data ?? [];
+        final topBerberler = berberler.where((b) => (double.tryParse(b['puan']?.toString() ?? '0') ?? 0) >= 4.5).toList();
 
-        if (berberler.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.storefront_outlined, size: 80, color: Colors.grey),
-                const SizedBox(height: 20),
-                Text("$seciliSehir için henüz bir salon eklenmedi."),
-              ],
+        return CustomScrollView(
+          slivers: [
+            // Karşılama Metni
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Merhaba, ${userName?.split(' ')[0] ?? 'Misafir'} 👋",
+                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                    const Text(
+                      "Bugün tarzını yenilemeye ne dersin?",
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          );
-        }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(20),
-          itemCount: berberler.length,
-          itemBuilder: (context, index) => _berberKarti(context, berberler[index]),
+            // Top Salonlar Slider
+            if (topBerberler.isNotEmpty) ...[
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+                  child: Text("Öne Çıkan Salonlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 220,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: topBerberler.length,
+                    itemBuilder: (context, index) => _topBerberKarti(context, topBerberler[index]),
+                  ),
+                ),
+              ),
+            ],
+
+            // Tüm Salonlar Başlığı
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 30, 20, 15),
+                child: Text("Yakınındaki Tüm Salonlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+            ),
+
+            // Tüm Salonlar Listesi
+            if (berberler.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.storefront_outlined, size: 80, color: Colors.grey),
+                      const SizedBox(height: 20),
+                      Text("$seciliSehir için henüz bir salon eklenmedi."),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _berberKarti(context, berberler[index]),
+                    childCount: berberler.length,
+                  ),
+                ),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 30)),
+          ],
         );
       },
     );
   }
 
+  Widget _topBerberKarti(BuildContext context, Map<String, dynamic> berber) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RandevuDetayEkrani(berber: berber, musteriTelefon: musteriTelefon, userName: userName))),
+      child: Container(
+        width: 280,
+        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 5))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+                    child: Image.network(
+                      berber['resim'] ?? 'https://images.pexels.com/photos/3993323/pexels-photo-3993323.jpeg',
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, e, s) => Container(color: Colors.grey[100], child: const Icon(Icons.image_not_supported)),
+                    ),
+                  ),
+                  Positioned(
+                    top: 15,
+                    right: 15,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
+                          Text(" ${berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(15),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(berber['isim'] ?? 'İsimsiz Salon', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 14, color: theme.primaryColor),
+                      const SizedBox(width: 4),
+                      Text(berber['sehir'] ?? "", style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _berberKarti(BuildContext context, Map<String, dynamic> berber) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RandevuDetayEkrani(berber: berber, musteriTelefon: musteriTelefon, userName: userName))),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white, 
-          borderRadius: BorderRadius.circular(20), 
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 5))]
+          borderRadius: BorderRadius.circular(22), 
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))]
         ),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)),
+              borderRadius: BorderRadius.circular(18),
               child: Image.network(
                 berber['resim'] ?? 'https://images.pexels.com/photos/3993323/pexels-photo-3993323.jpeg', 
-                width: 110, height: 110, fit: BoxFit.cover,
-                errorBuilder: (c,e,s) => Container(width: 110, height: 110, color: Colors.grey[100], child: const Icon(Icons.image_not_supported)),
+                width: 90, height: 90, fit: BoxFit.cover,
+                errorBuilder: (c,e,s) => Container(width: 90, height: 90, color: Colors.grey[100], child: const Icon(Icons.image_not_supported)),
               ),
             ),
             const SizedBox(width: 16),
@@ -205,16 +346,35 @@ class AnaSayfaIcerik extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(berber['isim'] ?? 'İsimsiz Salon', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-                  const SizedBox(height: 4),
-                  Row(children: [const Icon(Icons.star_rounded, color: Colors.amber, size: 18), Text(" ${berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold))]),
-                  const SizedBox(height: 4),
-                  Text(berber['sehir'] ?? "", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(berber['isim'] ?? 'İsimsiz Salon', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                        Text(" ${berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amber)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 12, color: theme.primaryColor.withOpacity(0.5)),
+                      const SizedBox(width: 4),
+                      Text(berber['sehir']?.split(',')[0] ?? "", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Colors.grey),
-            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.05), shape: BoxShape.circle),
+              child: Icon(Icons.chevron_right_rounded, color: theme.primaryColor),
+            ),
           ],
         ),
       ),

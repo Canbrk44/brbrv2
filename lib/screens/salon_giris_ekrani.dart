@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'salon_panel_ekrani.dart';
@@ -21,7 +22,7 @@ class _SalonGirisEkraniState extends State<SalonGirisEkrani> {
 
     if (email.isEmpty || sifre.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Lütfen e-posta ve şifre alanlarını doldurun.")),
+        const SnackBar(content: Text("Lütfen alanları doldurun.")),
       );
       return;
     }
@@ -40,20 +41,15 @@ class _SalonGirisEkraniState extends State<SalonGirisEkrani> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      String mesaj = "Bir hata oluştu: ${e.message}";
+      String mesaj = "Hata: ${e.message}";
       if (e.code == 'user-not-found') mesaj = "Kullanıcı bulunamadı.";
       else if (e.code == 'wrong-password') mesaj = "Hatalı şifre.";
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(mesaj),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF4E342E),
         ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Hata: $e")));
       }
     } finally {
       if (mounted) setState(() => _yukleniyor = false);
@@ -63,98 +59,106 @@ class _SalonGirisEkraniState extends State<SalonGirisEkrani> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(Icons.store_rounded, size: 40, color: Colors.white),
+      body: Stack(
+        children: [
+          // Arka Plan Resmi (Salon Temalı)
+          Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: NetworkImage("https://images.unsplash.com/photo-1512690196248-7374bdb444a1?w=800"),
+                fit: BoxFit.cover,
               ),
-              const SizedBox(height: 32),
-              const Text(
-                "Salon Paneli",
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-              ),
-              const Text(
-                "Yönetici hesabınızla giriş yapın",
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-              const SizedBox(height: 40),
-              
-              // E-posta Alanı
-              _inputLabel("E-POSTA ADRESİ"),
-              TextField(
-                controller: _emailController,
-                decoration: _inputDecoration(Icons.email_outlined, "ornek@salon.com"),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 24),
-              
-              // Şifre Alanı
-              _inputLabel("ŞİFRE"),
-              TextField(
-                controller: _sifreController,
-                obscureText: !_sifreGoster,
-                decoration: _inputDecoration(
-                  Icons.lock_outline_rounded, 
-                  "••••••••",
-                  suffixIcon: IconButton(
-                    icon: Icon(_sifreGoster ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
-                    onPressed: () => setState(() => _sifreGoster = !_sifreGoster),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text("Şifremi Unuttum", style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600)),
-                ),
-              ),
-              const SizedBox(height: 32),
-              
-              _yukleniyor 
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF0F172A)))
-                : ElevatedButton(
-                    onPressed: _girisYap,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F172A),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 60),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                      elevation: 0,
-                    ),
-                    child: const Text("GİRİŞ YAP", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  ),
-              const SizedBox(height: 40),
-              const Center(
-                child: Text(
-                  "Henüz bir salonunuz yok mu? Bize ulaşın.",
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          // Kahverengi Blur Katmanı
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF4E342E).withOpacity(0.6),
+                    const Color(0xFF2D1B18).withOpacity(0.98),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 30.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(height: 40),
+                  const Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.store_rounded, size: 80, color: Color(0xFFD7CCC8)),
+                        SizedBox(height: 20),
+                        Text(
+                          "Salon Yönetimi",
+                          style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        Text(
+                          "Yönetici girişi yaparak salonunuzu yönetin",
+                          style: TextStyle(color: Color(0xFFD7CCC8), fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 60),
+                  
+                  _inputLabel("E-POSTA ADRESİ"),
+                  _buildTextField(
+                    controller: _emailController,
+                    icon: Icons.email_outlined,
+                    hint: "admin@salon.com",
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  _inputLabel("ŞİFRE"),
+                  _buildTextField(
+                    controller: _sifreController,
+                    icon: Icons.lock_outline_rounded,
+                    hint: "••••••••",
+                    obscureText: !_sifreGoster,
+                    suffixIcon: IconButton(
+                      icon: Icon(_sifreGoster ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.white70, size: 20),
+                      onPressed: () => setState(() => _sifreGoster = !_sifreGoster),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 40),
+                  _yukleniyor 
+                    ? const Center(child: CircularProgressIndicator(color: Color(0xFF8D6E63)))
+                    : SizedBox(
+                        width: double.infinity,
+                        height: 60,
+                        child: ElevatedButton(
+                          onPressed: _girisYap,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF8D6E63),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            elevation: 10,
+                          ),
+                          child: const Text("GİRİŞ YAP", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                        ),
+                      ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -164,26 +168,44 @@ class _SalonGirisEkraniState extends State<SalonGirisEkrani> {
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), letterSpacing: 1),
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD7CCC8), letterSpacing: 1.5),
       ),
     );
   }
 
-  InputDecoration _inputDecoration(IconData icon, String hint, {Widget? suffixIcon}) {
-    return InputDecoration(
-      hintText: hint,
-      prefixIcon: Icon(icon, color: const Color(0xFF0F172A), size: 22),
-      suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(vertical: 20),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: Colors.grey.withOpacity(0.2)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5),
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required IconData icon,
+    required String hint,
+    bool obscureText = false,
+    Widget? suffixIcon,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white30),
+        prefixIcon: Icon(icon, color: const Color(0xFFD7CCC8), size: 22),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        contentPadding: const EdgeInsets.symmetric(vertical: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: Color(0xFF8D6E63), width: 2),
+        ),
       ),
     );
   }

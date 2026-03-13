@@ -11,26 +11,38 @@ class SalonPanelEkrani extends StatefulWidget {
   State<SalonPanelEkrani> createState() => _SalonPanelEkraniState();
 }
 
-class _SalonPanelEkraniState extends State<SalonPanelEkrani> {
+class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerProviderStateMixin {
   final DatabaseService _db = DatabaseService();
   Map<String, dynamic>? _salon;
   bool _yukleniyor = true;
   DateTime _seciliTarih = DateTime.now();
   bool _takvimAcik = false;
-  int _currentTabIndex = 0;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); 
+    });
     _salonBilgileriniGetir();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _salonBilgileriniGetir() async {
     final data = await _db.salonGetirByEmail(widget.ownerEmail);
-    setState(() {
-      _salon = data;
-      _yukleniyor = false;
-    });
+    if (mounted) {
+      setState(() {
+        _salon = data;
+        _yukleniyor = false;
+      });
+    }
   }
 
   @override
@@ -38,44 +50,41 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> {
     if (_yukleniyor) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_salon == null) return Scaffold(appBar: AppBar(), body: const Center(child: Text("Salon bulunamadı.")));
 
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(_salon!['isim'] ?? "Salon Paneli"),
-          bottom: TabBar(
-            isScrollable: true,
-            onTap: (index) {
-              setState(() {
-                _currentTabIndex = index;
-              });
-            },
-            tabs: const [
-              Tab(icon: Icon(Icons.analytics_outlined), text: "İstatistik"),
-              Tab(icon: Icon(Icons.people_alt_outlined), text: "Müşteriler"),
-              Tab(icon: Icon(Icons.person_outline), text: "Ustalar"),
-              Tab(icon: Icon(Icons.list_alt_outlined), text: "Hizmetler"),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _istatistikSekmesi(),
-            _musterilerSekmesi(),
-            _ustalarSekmesi(),
-            _hizmetlerSekmesi(),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_salon!['isim'] ?? "Salon Paneli"),
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabs: const [
+            Tab(icon: Icon(Icons.analytics_outlined), text: "İstatistik"),
+            Tab(icon: Icon(Icons.people_alt_outlined), text: "Müşteriler"),
+            Tab(icon: Icon(Icons.person_outline), text: "Ustalar"),
+            Tab(icon: Icon(Icons.list_alt_outlined), text: "Hizmetler"),
           ],
         ),
-        floatingActionButton: (_currentTabIndex == 2 || _currentTabIndex == 3)
-            ? FloatingActionButton(
-                onPressed: () => _eklemeDialogGoster(context),
-                child: const Icon(Icons.add),
-              )
-            : null,
       ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _istatistikSekmesi(),
+          _musterilerSekmesi(),
+          _ustalarSekmesi(),
+          _hizmetlerSekmesi(),
+        ],
+      ),
+      floatingActionButton: (_tabController.index == 2 || _tabController.index == 3)
+          ? FloatingActionButton(
+              backgroundColor: const Color(0xFF4E342E),
+              foregroundColor: Colors.white,
+              onPressed: () => _eklemeDialogGoster(context),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 
+  // --- İSTATİSTİK SEKMESİ ---
   Widget _istatistikSekmesi() {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _db.salonRandevulariniGetir(_salon!['isim']),
@@ -86,17 +95,13 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> {
         final formatliSeciliTarih = DateFormat('dd.MM.yyyy').format(_seciliTarih);
         final gunlukRandevular = tumRandevular.where((r) => r['tarih'] == formatliSeciliTarih).toList();
         
-        double toplamGelir = 0;
-        for (var r in tumRandevular) {
-          toplamGelir += 150; // Örnek sabit fiyat, normalde hizmet fiyatından gelmeli
-        }
+        double toplamGelir = tumRandevular.length * 200.0;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Üst Özet Kartları
               Row(
                 children: [
                   Expanded(child: _miniOzetKarti("Toplam", "${tumRandevular.length}", Colors.blue)),
@@ -107,8 +112,6 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> {
                 ],
               ),
               const SizedBox(height: 20),
-
-              // Genişleyebilir Takvim Alanı
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -118,17 +121,9 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> {
                 child: Column(
                   children: [
                     ListTile(
-                      leading: const Icon(Icons.calendar_month, color: Color(0xFF0F172A)),
-                      title: Text(
-                        _seciliTarih.year == DateTime.now().year && _seciliTarih.month == DateTime.now().month && _seciliTarih.day == DateTime.now().day
-                            ? "Bugünkü Randevular"
-                            : "$formatliSeciliTarih Randevuları",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      trailing: IconButton(
-                        icon: Icon(_takvimAcik ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down),
-                        onPressed: () => setState(() => _takvimAcik = !_takvimAcik),
-                      ),
+                      leading: const Icon(Icons.calendar_month, color: Color(0xFF4E342E)),
+                      title: Text(formatliSeciliTarih, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      trailing: Icon(_takvimAcik ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down),
                       onTap: () => setState(() => _takvimAcik = !_takvimAcik),
                     ),
                     if (_takvimAcik) 
@@ -146,18 +141,11 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> {
                   ],
                 ),
               ),
-              
               const SizedBox(height: 20),
-              const Text("Randevu Listesi", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text("Günlük Randevular", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
-              
               if (gunlukRandevular.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(40.0),
-                    child: Text("Bu tarihte randevu bulunmuyor.", style: TextStyle(color: Colors.grey)),
-                  ),
-                )
+                const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text("Randevu yok.")))
               else
                 ListView.builder(
                   shrinkWrap: true,
@@ -166,20 +154,10 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> {
                   itemBuilder: (context, index) {
                     final r = gunlukRandevular[index];
                     return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       child: ListTile(
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: const Color(0xFF0F172A).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                          child: Text(r['saat'] ?? "--:--", style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                        ),
-                        title: Text(r['musteriAd'] ?? "İsimsiz Müşteri"),
-                        subtitle: Text("${r['ustaIsmi']} - ${r['kisiTuru']}"),
-                        trailing: Icon(
-                          r['durum'] == 'aktif' ? Icons.check_circle_outline : Icons.history,
-                          color: r['durum'] == 'aktif' ? Colors.green : Colors.grey,
-                        ),
+                        leading: CircleAvatar(backgroundColor: const Color(0xFF4E342E), child: Text(r['saat'] ?? "", style: const TextStyle(color: Colors.white, fontSize: 10))),
+                        title: Text(r['musteriAd'] ?? "Müşteri"),
+                        subtitle: Text(r['ustaIsmi'] ?? ""),
                       ),
                     );
                   },
@@ -194,120 +172,123 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> {
   Widget _miniOzetKarti(String baslik, String deger, Color renk) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: renk.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: renk.withOpacity(0.2)),
-      ),
-      child: Column(
-        children: [
-          Text(baslik, style: TextStyle(color: renk, fontSize: 12, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(deger, style: TextStyle(color: renk, fontSize: 18, fontWeight: FontWeight.bold)),
-        ],
-      ),
+      decoration: BoxDecoration(color: renk.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+      child: Column(children: [Text(baslik, style: TextStyle(color: renk, fontSize: 12)), Text(deger, style: TextStyle(color: renk, fontSize: 18, fontWeight: FontWeight.bold))]),
     );
   }
 
+  // --- MÜŞTERİLER SEKMESİ ---
   Widget _musterilerSekmesi() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('randevular').where('berberIsmi', isEqualTo: _salon!['isim']).snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-
-        // Müşteri bazlı gruplama
-        Map<String, int> musteriRandevuSayilari = {};
-        Map<String, String> musteriTelefonlari = {};
-
+        Map<String, int> musteriler = {};
         for (var doc in snapshot.data!.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          final ad = data['musteriAd'] ?? "Bilinmiyor";
-          final tel = data['musteriTelefon'] ?? "-";
-          
-          musteriRandevuSayilari[ad] = (musteriRandevuSayilari[ad] ?? 0) + 1;
-          musteriTelefonlari[ad] = tel;
+          final ad = doc['musteriAd'] ?? "Bilinmiyor";
+          musteriler[ad] = (musteriler[ad] ?? 0) + 1;
         }
-
-        final siraliMusteriler = musteriRandevuSayilari.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: siraliMusteriler.length,
-          separatorBuilder: (context, index) => const Divider(),
-          itemBuilder: (context, index) {
-            final entry = siraliMusteriler[index];
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: const Color(0xFF0F172A),
-                child: Text(entry.key[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
-              ),
-              title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(musteriTelefonlari[entry.key] ?? ""),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text("${entry.value} Randevu", style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12)),
-              ),
-            );
-          },
+        final liste = musteriler.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+        return ListView.builder(
+          itemCount: liste.length,
+          itemBuilder: (context, index) => ListTile(
+            leading: const CircleAvatar(child: Icon(Icons.person)),
+            title: Text(liste[index].key),
+            trailing: Chip(label: Text("${liste[index].value} Randevu")),
+          ),
         );
       },
     );
   }
 
+  // --- USTALAR SEKMESİ ---
   Widget _ustalarSekmesi() {
     final List ustalar = _salon!['ustalar'] ?? [];
+    if (ustalar.isEmpty) return const Center(child: Text("Henüz usta eklenmemiş."));
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: ustalar.length,
       itemBuilder: (context, index) => Card(
-        margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
-          leading: const CircleAvatar(child: Icon(Icons.person)),
+          leading: CircleAvatar(backgroundImage: NetworkImage(ustalar[index]['resim'] ?? 'https://i.pravatar.cc/150?u=${ustalar[index]['isim']}')),
           title: Text(ustalar[index]['isim'], style: const TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text(ustalar[index]['uzmanlik'] ?? "Berber"),
-          trailing: IconButton(icon: const Icon(Icons.edit_outlined, size: 20), onPressed: () {}),
+          trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _silmeOnayi(index, true)),
         ),
       ),
     );
   }
 
+  // --- HİZMETLER SEKMESİ ---
   Widget _hizmetlerSekmesi() {
     final List hizmetler = _salon!['hizmetler'] ?? [];
+    if (hizmetler.isEmpty) return const Center(child: Text("Henüz hizmet eklenmemiş."));
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: hizmetler.length,
       itemBuilder: (context, index) => Card(
-        margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
-          leading: const Icon(Icons.content_cut, color: Color(0xFF0F172A)),
+          leading: const Icon(Icons.content_cut, color: Color(0xFF4E342E)),
           title: Text(hizmetler[index]['isim'], style: const TextStyle(fontWeight: FontWeight.bold)),
-          trailing: Text("${hizmetler[index]['fiyat']} TL", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("${hizmetler[index]['fiyat']} TL", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+              IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _silmeOnayi(index, false)),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  void _silmeOnayi(int index, bool isUsta) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Emin misiniz?"),
+        content: Text("Bu ${isUsta ? 'ustayı' : 'hizmeti'} silmek istediğinize emin misiniz?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("İptal")),
+          TextButton(
+            onPressed: () async {
+              List liste = List.from(isUsta ? _salon!['ustalar'] : _salon!['hizmetler']);
+              liste.removeAt(index);
+              await FirebaseFirestore.instance.collection('salonlar').doc(_salon!['id']).update({
+                isUsta ? 'ustalar' : 'hizmetler': liste
+              });
+              Navigator.pop(context);
+              _salonBilgileriniGetir();
+            }, 
+            child: const Text("Sil", style: TextStyle(color: Colors.red))
+          ),
+        ],
       ),
     );
   }
 
   void _eklemeDialogGoster(BuildContext context) {
-    final tabIndex = _currentTabIndex;
-    if (tabIndex != 2 && tabIndex != 3) return;
-
+    final isUstaSecili = _tabController.index == 2;
     final controller1 = TextEditingController();
     final controller2 = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(tabIndex == 2 ? "Yeni Usta Ekle" : "Yeni Hizmet Ekle"),
+        title: Text(isUstaSecili ? "Yeni Usta Ekle" : "Yeni Hizmet Ekle"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: controller1, decoration: InputDecoration(labelText: tabIndex == 2 ? "Usta Adı Soyadı" : "Hizmet Adı")),
+            TextField(
+              controller: controller1, 
+              // Herhangi bir filtreleme koymadık, Türkçe karakterleri otomatik kabul eder.
+              keyboardType: TextInputType.text,
+              decoration: InputDecoration(labelText: isUstaSecili ? "Usta Adı Soyadı" : "Hizmet Adı")
+            ),
             TextField(
               controller: controller2, 
-              decoration: InputDecoration(labelText: tabIndex == 2 ? "Uzmanlık Alanı" : "Fiyat (TL)"),
-              keyboardType: tabIndex == 3 ? TextInputType.number : TextInputType.text,
+              decoration: InputDecoration(labelText: isUstaSecili ? "Uzmanlık (Örn: Saç & Sakal)" : "Fiyat (TL)"),
+              keyboardType: isUstaSecili ? TextInputType.text : TextInputType.number,
             ),
           ],
         ),
@@ -315,13 +296,29 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("İptal")),
           ElevatedButton(
             onPressed: () async {
-              if (tabIndex == 2) {
-                await _db.ustaEkle(_salon!['id'], {'isim': controller1.text, 'uzmanlik': controller2.text});
+              if (controller1.text.isEmpty || controller2.text.isEmpty) return;
+
+              if (isUstaSecili) {
+                final yeniUsta = {
+                  'isim': controller1.text,
+                  'uzmanlik': controller2.text,
+                  'resim': 'https://i.pravatar.cc/150?u=${controller1.text}',
+                  'puan': 5.0,
+                  'doluSaatler': []
+                };
+                await _db.ustaEkle(_salon!['id'], yeniUsta);
               } else {
-                await _db.hizmetEkle(_salon!['id'], {'isim': controller1.text, 'fiyat': controller2.text});
+                final yeniHizmet = {
+                  'isim': controller1.text,
+                  'fiyat': int.tryParse(controller2.text) ?? 0
+                };
+                await _db.hizmetEkle(_salon!['id'], yeniHizmet);
               }
-              Navigator.pop(context);
-              _salonBilgileriniGetir();
+              
+              if (mounted) {
+                Navigator.pop(context);
+                _salonBilgileriniGetir(); 
+              }
             },
             child: const Text("Kaydet"),
           ),
