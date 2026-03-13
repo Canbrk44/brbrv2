@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/database_service.dart';
 import 'ana_sayfa.dart';
@@ -48,12 +46,16 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
       return;
     }
 
+    // Gerçek bir SMS doğrulaması simülasyonu için 1234 kodunu kabul edelim (Test amaçlı)
+    // if (_codeController.text != "1234") { ... }
+
     if (widget.isLogin) {
       if (widget.userName != null && widget.musteriTelefon != null) {
-        final mevcut = await _dbService.musteriGetir(widget.musteriTelefon!);
-        if (mevcut == null) {
-          await _dbService.musteriKaydet(widget.userName!, widget.musteriTelefon!);
-        }
+        // Kullanıcıyı 'users' koleksiyonuna kaydet (veya güncelle)
+        await _dbService.kullaniciKaydet(
+          adSoyad: widget.userName!,
+          telefon: widget.musteriTelefon!,
+        );
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_phone', widget.musteriTelefon!);
@@ -67,35 +69,16 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
         );
       }
     } else {
-      // Randevuyu önce yerel SQLite'a kaydet
+      // Randevu oluşturma işlemi
       await _dbService.randevuOlustur(
         musteriTelefon: widget.musteriTelefon ?? "Misafir",
+        musteriAd: widget.userName ?? "Misafir",
         berberIsmi: widget.berberIsmi,
         ustaIsmi: widget.ustaIsmi,
         tarih: widget.tarih,
         saat: widget.saat,
         kisiTuru: widget.kisiTuru ?? "Yetişkin",
       );
-
-      // Randevuyu sunucuya da gönder (Admin dashboard için)
-      try {
-        await http.post(
-          Uri.parse('http://10.0.2.2:3000/api/randevular'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'musteriTelefon': widget.musteriTelefon ?? "Misafir",
-            'musteriAd': widget.userName ?? "Misafir",
-            'berberIsmi': widget.berberIsmi,
-            'ustaIsmi': widget.ustaIsmi,
-            'tarih': widget.tarih,
-            'saat': widget.saat,
-            'kisiTuru': widget.kisiTuru ?? "Yetişkin",
-            'durum': 'aktif'
-          }),
-        );
-      } catch (e) {
-        debugPrint("Sunucuya randevu iletilemedi: $e");
-      }
 
       if (!mounted) return;
       _basariliDialog(context);
@@ -105,13 +88,13 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("SMS Onayı")),
+      appBar: AppBar(title: const Text("Doğrulama")),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.security_rounded, size: 80, color: Color(0xFF0F172A)),
+            const Icon(Icons.security_rounded, size: 80, color: Color(0xFF4E342E)),
             const SizedBox(height: 20),
             Text(
               widget.isLogin ? "Giriş Doğrulaması" : "Randevu Onayı",
@@ -119,9 +102,7 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
             ),
             const SizedBox(height: 10),
             Text(
-              widget.isLogin 
-                ? "${widget.musteriTelefon} numarasına gönderilen onay kodunu girin."
-                : "${widget.berberIsmi} randevusu için onay kodunu girin.",
+              "${widget.musteriTelefon} numarasına gönderilen onay kodunu girin.",
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600]),
             ),
@@ -132,12 +113,16 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
               textAlign: TextAlign.center,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)],
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 10),
-              decoration: InputDecoration(hintText: "0000", hintStyle: TextStyle(color: Colors.grey[300], letterSpacing: 10)),
+              decoration: InputDecoration(
+                hintText: "0000", 
+                hintStyle: TextStyle(color: Colors.grey[300], letterSpacing: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+              ),
             ),
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: _dogrulaVeKaydet,
-              child: Text(widget.isLogin ? "DOĞRULA VE GİRİŞ YAP" : "ONAYLA VE RANDEVUYU TAMAMLA"),
+              child: Text(widget.isLogin ? "DOĞRULA VE GİRİŞ YAP" : "ONAYLA VE RANDEVU AL"),
             ),
           ],
         ),
@@ -156,9 +141,9 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
           children: [
             const Icon(Icons.check_circle, color: Colors.green, size: 80),
             const SizedBox(height: 20),
-            const Text("Randevunuz Alındı!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text("İşlem Başarılı!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            const Text("Randevu detaylarını 'Randevularım' sekmesinden görebilirsiniz.", textAlign: TextAlign.center),
+            const Text("İşleminiz başarıyla tamamlandı.", textAlign: TextAlign.center),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
@@ -168,7 +153,7 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
                   (route) => false,
                 );
               },
-              child: const Text("Randevularıma Git"),
+              child: const Text("Tamam"),
             )
           ],
         ),
