@@ -125,7 +125,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
   }
 }
 
-class AnaSayfaIcerik extends StatelessWidget {
+class AnaSayfaIcerik extends StatefulWidget {
   final String? musteriTelefon;
   final String? userName;
   final String seciliSehir;
@@ -139,14 +139,35 @@ class AnaSayfaIcerik extends StatelessWidget {
     required this.onCityTap
   });
 
+  @override
+  State<AnaSayfaIcerik> createState() => _AnaSayfaIcerikState();
+}
+
+class _AnaSayfaIcerikState extends State<AnaSayfaIcerik> with SingleTickerProviderStateMixin {
+  late AnimationController _glowController;
   static const String defaultSalonImg = "https://images.pexels.com/photos/1319461/pexels-photo-1319461.jpeg";
+
+  @override
+  void initState() {
+    super.initState();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final DatabaseService db = DatabaseService();
 
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: db.salonlariGetir(seciliSehir),
+      stream: db.salonlariGetir(widget.seciliSehir),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
@@ -180,7 +201,7 @@ class AnaSayfaIcerik extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Merhaba, ${userName?.split(' ')[0] ?? 'Misafir'} 👋", 
+                    Text("Merhaba, ${widget.userName?.split(' ')[0] ?? 'Misafir'} 👋", 
                       style: TextStyle(color: Colors.grey[600], fontSize: 16, fontWeight: FontWeight.w400)),
                     const Text("Bugün tarzını yenile!", 
                       style: TextStyle(color: Color(0xFF4E342E), fontSize: 24, fontWeight: FontWeight.bold)),
@@ -202,7 +223,7 @@ class AnaSayfaIcerik extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
                 child: GestureDetector(
-                  onTap: onCityTap,
+                  onTap: widget.onCityTap,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]),
@@ -210,7 +231,7 @@ class AnaSayfaIcerik extends StatelessWidget {
                       children: [
                         const Icon(Icons.location_on, color: Color(0xFF4E342E), size: 20),
                         const SizedBox(width: 12),
-                        Text(seciliSehir, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text(widget.seciliSehir, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                         const Spacer(),
                         const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey),
                       ],
@@ -220,7 +241,6 @@ class AnaSayfaIcerik extends StatelessWidget {
               ),
             ),
 
-            // ÖNE ÇIKAN SALONLAR
             if (topBerberler.isNotEmpty) ...[
               const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(25, 30, 25, 15), child: Text("Öne Çıkan Salonlar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
               SliverToBoxAdapter(
@@ -230,23 +250,26 @@ class AnaSayfaIcerik extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     scrollDirection: Axis.horizontal,
                     itemCount: topBerberler.length,
-                    itemBuilder: (context, index) => _TopSalonKarti(berber: topBerberler[index], tel: musteriTelefon, ad: userName),
+                    itemBuilder: (context, index) => _TopSalonKarti(berber: topBerberler[index], tel: widget.musteriTelefon, ad: widget.userName),
                   ),
                 ),
               ),
             ],
 
-            // YILDIZ USTALAR
             if (topUstalar.isNotEmpty) ...[
               const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(25, 35, 25, 10), child: Text("Yıldız Ustalar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 110,
+                  height: 120,
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     scrollDirection: Axis.horizontal,
                     itemCount: topUstalar.length,
-                    itemBuilder: (context, index) => _UstaAvatarKarti(usta: topUstalar[index]),
+                    itemBuilder: (context, index) => _UstaAvatarKarti(
+                      usta: topUstalar[index], 
+                      isTop: index == 0,
+                      glowAnimation: _glowController,
+                    ),
                   ),
                 ),
               ),
@@ -258,7 +281,7 @@ class AnaSayfaIcerik extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 25),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) => _NormalSalonKarti(berber: berberler[index], tel: musteriTelefon, ad: userName),
+                  (context, index) => _NormalSalonKarti(berber: berberler[index], tel: widget.musteriTelefon, ad: widget.userName),
                   childCount: berberler.length,
                 ),
               ),
@@ -278,7 +301,10 @@ class AnaSayfaIcerik extends StatelessWidget {
 
 class _UstaAvatarKarti extends StatelessWidget {
   final Map<String, dynamic> usta;
-  const _UstaAvatarKarti({required this.usta});
+  final bool isTop;
+  final Animation<double>? glowAnimation;
+
+  const _UstaAvatarKarti({required this.usta, this.isTop = false, this.glowAnimation});
 
   @override
   Widget build(BuildContext context) {
@@ -292,19 +318,42 @@ class _UstaAvatarKarti extends StatelessWidget {
             Stack(
               alignment: Alignment.bottomRight,
               children: [
-                CircleAvatar(
-                  radius: 35,
-                  backgroundImage: NetworkImage(usta['resim'] ?? 'https://i.pravatar.cc/150?u=${usta['isim']}'),
-                ),
+                if (isTop) 
+                  AnimatedBuilder(
+                    animation: glowAnimation!,
+                    builder: (context, child) => Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withOpacity(0.6 * glowAnimation!.value),
+                            blurRadius: 10 * glowAnimation!.value,
+                            spreadRadius: 2 * glowAnimation!.value,
+                          )
+                        ],
+                        border: Border.all(color: Colors.amber, width: 2),
+                      ),
+                      child: CircleAvatar(
+                        radius: 35,
+                        backgroundImage: NetworkImage(usta['resim'] ?? 'https://i.pravatar.cc/150?u=${usta['isim']}'),
+                      ),
+                    ),
+                  )
+                else
+                  CircleAvatar(
+                    radius: 35,
+                    backgroundImage: NetworkImage(usta['resim'] ?? 'https://i.pravatar.cc/150?u=${usta['isim']}'),
+                  ),
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                  child: const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                  child: Icon(isTop ? Icons.emoji_events_rounded : Icons.star_rounded, color: Colors.amber, size: 14),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(usta['isim']?.split(' ')[0] ?? "", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(usta['isim']?.split(' ')[0] ?? "", style: TextStyle(fontSize: 12, fontWeight: isTop ? FontWeight.bold : FontWeight.normal), maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
@@ -328,7 +377,7 @@ class _TopSalonKarti extends StatelessWidget {
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 20, offset: const Offset(0, 10))]),
         child: Column(
           children: [
-            Expanded(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(30)), child: AnaSayfaIcerik._resimKontrol(berber['resim']))),
+            Expanded(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(30)), child: _AnaSayfaIcerikState._resimKontrol(berber['resim']))),
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -370,7 +419,7 @@ class _NormalSalonKarti extends StatelessWidget {
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 5))]),
         child: Row(
           children: [
-            ClipRRect(borderRadius: BorderRadius.circular(15), child: SizedBox(width: 80, height: 80, child: AnaSayfaIcerik._resimKontrol(berber['resim']))),
+            ClipRRect(borderRadius: BorderRadius.circular(15), child: SizedBox(width: 80, height: 80, child: _AnaSayfaIcerikState._resimKontrol(berber['resim']))),
             const SizedBox(width: 15),
             Expanded(
               child: Column(

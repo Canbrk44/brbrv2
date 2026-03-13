@@ -14,8 +14,24 @@ class EnIyilerEkrani extends StatefulWidget {
   State<EnIyilerEkrani> createState() => _EnIyilerEkraniState();
 }
 
-class _EnIyilerEkraniState extends State<EnIyilerEkrani> {
+class _EnIyilerEkraniState extends State<EnIyilerEkrani> with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late AnimationController _glowController;
+
+  @override
+  void initState() {
+    super.initState();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
+  }
 
   Future<Map<String, List<Map<String, dynamic>>>> _getEnIyilerFirebase() async {
     try {
@@ -133,7 +149,11 @@ class _EnIyilerEkraniState extends State<EnIyilerEkrani> {
                       const SizedBox(height: 40),
                       const _Baslik(yazi: "En İyi Ustalar"),
                       const SizedBox(height: 15),
-                      ...ustalar.map((u) => _UstaCard(u: u)),
+                      ...List.generate(ustalar.length, (index) => _UstaCard(
+                        u: ustalar[index], 
+                        isTop: index == 0,
+                        glowAnimation: _glowController,
+                      )),
                       const SizedBox(height: 100),
                     ],
                   ),
@@ -212,48 +232,127 @@ class _SalonCard extends StatelessWidget {
 
 class _UstaCard extends StatelessWidget {
   final Map<String, dynamic> u;
-  const _UstaCard({required this.u});
+  final bool isTop;
+  final Animation<double>? glowAnimation;
+
+  const _UstaCard({required this.u, this.isTop = false, this.glowAnimation});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => UstaDetayEkrani(usta: u, salonIsmi: u['salon'] ?? ""))),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 15),
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.white, 
-          borderRadius: BorderRadius.circular(22), 
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 32, 
-              backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}')
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, 
-                children: [
-                  Text(u['isim'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), 
-                  Text(u['salon'] ?? "", style: TextStyle(color: Colors.grey[500], fontSize: 12))
-                ]
+      child: isTop ? _buildGlowTopCard() : _buildNormalCard(),
+    );
+  }
+
+  Widget _buildGlowTopCard() {
+    return AnimatedBuilder(
+      animation: glowAnimation!,
+      builder: (context, child) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white, 
+            borderRadius: BorderRadius.circular(28), 
+            boxShadow: [
+              BoxShadow(
+                color: Colors.amber.withOpacity(0.4 * glowAnimation!.value), 
+                blurRadius: 15 * glowAnimation!.value, 
+                spreadRadius: 2 * glowAnimation!.value
               )
+            ],
+            border: Border.all(
+              color: Colors.amber.withOpacity(0.5 + (0.5 * glowAnimation!.value)), 
+              width: 2
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), 
-              decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), 
-              child: Row(
+          ),
+          child: Row(
+            children: [
+              Stack(
+                alignment: Alignment.topRight,
                 children: [
-                  const Icon(Icons.star_rounded, color: Colors.amber, size: 16), 
-                  Text(" ${u['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amber))
-                ]
-              )
-            ),
-          ],
-        ),
+                  CircleAvatar(
+                    radius: 38, 
+                    backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}')
+                  ),
+                  const Positioned(
+                    top: -5, right: -5,
+                    child: Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 28),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, 
+                  children: [
+                    Row(
+                      children: [
+                        Text(u['isim'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.verified, color: Colors.blue, size: 16),
+                      ],
+                    ), 
+                    Text(u['salon'] ?? "", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                    const SizedBox(height: 5),
+                    const Text("Şampiyon Usta", style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  ]
+                )
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), 
+                decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(12)), 
+                child: Row(
+                  children: [
+                    const Icon(Icons.star_rounded, color: Colors.white, size: 18), 
+                    Text(" ${u['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white))
+                  ]
+                )
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNormalCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(22), 
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 32, 
+            backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}')
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, 
+              children: [
+                Text(u['isim'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), 
+                Text(u['salon'] ?? "", style: TextStyle(color: Colors.grey[500], fontSize: 12))
+              ]
+            )
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), 
+            decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), 
+            child: Row(
+              children: [
+                const Icon(Icons.star_rounded, color: Colors.amber, size: 16), 
+                Text(" ${u['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amber))
+              ]
+            )
+          ),
+        ],
       ),
     );
   }

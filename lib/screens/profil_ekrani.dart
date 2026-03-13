@@ -104,17 +104,25 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
         slivers: [
           // WOW HEADER - PROFİL
           SliverAppBar(
-            expandedHeight: 200.0,
+            expandedHeight: 220.0,
             pinned: true,
             stretch: true,
             backgroundColor: const Color(0xFF4E342E),
             flexibleSpace: FlexibleSpaceBar(
-              title: const Text("Profilim", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+              title: const Text(
+                "Profilim", 
+                style: TextStyle(
+                  color: Colors.white, 
+                  fontWeight: FontWeight.bold, 
+                  fontSize: 18,
+                  shadows: [Shadow(color: Colors.black45, blurRadius: 10)]
+                )
+              ),
               background: Stack(
                 fit: StackFit.expand,
                 children: [
                   Image.network(
-                    'https://images.pexels.com/photos/1319461/pexels-photo-1319461.jpeg',
+                    'https://images.pexels.com/photos/3992870/pexels-photo-3992870.jpeg',
                     fit: BoxFit.cover,
                   ),
                   const DecoratedBox(

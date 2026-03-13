@@ -22,7 +22,7 @@ class _SalonGirisEkraniState extends State<SalonGirisEkrani> {
 
     if (email.isEmpty || sifre.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Lütfen alanları doldurun.")),
+        const SnackBar(content: Text("Lütfen e-posta ve şifrenizi girin.")),
       );
       return;
     }
@@ -41,15 +41,46 @@ class _SalonGirisEkraniState extends State<SalonGirisEkrani> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      String mesaj = "Hata: ${e.message}";
-      if (e.code == 'user-not-found') mesaj = "Kullanıcı bulunamadı.";
-      else if (e.code == 'wrong-password') mesaj = "Hatalı şifre.";
+      String mesaj = "Bir hata oluştu. Lütfen tekrar deneyin.";
+      
+      // FIREBASE HATA KODLARINI TÜRKÇELEŞTİRME
+      switch (e.code) {
+        case 'user-not-found':
+          mesaj = "Bu e-posta adresi ile kayıtlı bir kullanıcı bulunamadı.";
+          break;
+        case 'wrong-password':
+          mesaj = "Girdiğiniz şifre hatalı. Lütfen kontrol edin.";
+          break;
+        case 'invalid-email':
+          mesaj = "Lütfen geçerli bir e-posta adresi girin.";
+          break;
+        case 'user-disabled':
+          mesaj = "Bu hesap dondurulmuştur. Lütfen destek ile iletişime geçin.";
+          break;
+        case 'too-many-requests':
+          mesaj = "Çok fazla hatalı deneme yaptınız. Lütfen bir süre bekleyin.";
+          break;
+        case 'network-request-failed':
+          mesaj = "İnternet bağlantınızı kontrol edin.";
+          break;
+        case 'invalid-credential':
+          mesaj = "E-posta veya şifre hatalı.";
+          break;
+        default:
+          mesaj = "Giriş yapılamadı: Bilgilerinizi kontrol edin.";
+      }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(mesaj),
+          content: Text(mesaj, style: const TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: const Color(0xFF4E342E),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Beklenmedik bir hata oluştu.")));
       }
     } finally {
       if (mounted) setState(() => _yukleniyor = false);
@@ -61,7 +92,6 @@ class _SalonGirisEkraniState extends State<SalonGirisEkrani> {
     return Scaffold(
       body: Stack(
         children: [
-          // Arka Plan Resmi (Salon Temalı)
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
@@ -70,7 +100,6 @@ class _SalonGirisEkraniState extends State<SalonGirisEkrani> {
               ),
             ),
           ),
-          // Kahverengi Blur Katmanı
           BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
             child: Container(
