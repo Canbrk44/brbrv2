@@ -74,10 +74,37 @@ class DatabaseService {
     return snapshot.docs.length;
   }
 
-  Future<void> randevuyuTamamlaVeOyla(String id) async {
-    await _db.collection('randevular').doc(id).update({
-      'durum': 'Tamamlandı',
-      'oylandi': 1
+  // --- SALON SAHİBİ İŞLEMLERİ ---
+  
+  Future<Map<String, dynamic>?> salonGetirByEmail(String email) async {
+    var snapshot = await _db.collection('salonlar')
+        .where('sahipEmail', isEqualTo: email)
+        .limit(1)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
+      var data = snapshot.docs.first.data();
+      data['id'] = snapshot.docs.first.id;
+      return data;
+    }
+    return null;
+  }
+
+  Stream<List<Map<String, dynamic>>> salonRandevulariniGetir(String salonIsmi) {
+    return _db.collection('randevular')
+        .where('berberIsmi', isEqualTo: salonIsmi)
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
+  }
+
+  Future<void> ustaEkle(String salonId, Map<String, dynamic> usta) async {
+    await _db.collection('salonlar').doc(salonId).update({
+      'ustalar': FieldValue.arrayUnion([usta])
+    });
+  }
+
+  Future<void> hizmetEkle(String salonId, Map<String, dynamic> hizmet) async {
+    await _db.collection('salonlar').doc(salonId).update({
+      'hizmetler': FieldValue.arrayUnion([hizmet])
     });
   }
 
@@ -119,6 +146,13 @@ class DatabaseService {
             .toList());
   }
 
+  Future<void> randevuyuTamamlaVeOyla(String id) async {
+    await _db.collection('randevular').doc(id).update({
+      'durum': 'Tamamlandı',
+      'oylandi': 1
+    });
+  }
+
   Future<Map<String, dynamic>?> oylanmamisGecmisRandevuGetir(String telefon) async {
     var snapshot = await _db.collection('randevular')
         .where('musteriTelefon', isEqualTo: telefon)
@@ -132,11 +166,6 @@ class DatabaseService {
       data['id'] = snapshot.docs.first.id;
       return data;
     }
-    return null;
-  }
-
-  Future<Map<String, dynamic>?> yaklasanBugunkuRandevuyuGetir(String telefon) async {
-    // Basitleştirilmiş kontrol
     return null;
   }
 }

@@ -3,6 +3,7 @@ import 'profil_ekrani.dart';
 import 'randevular_ekrani.dart';
 import 'randevu_detay_ekrani.dart';
 import 'en_iyiler_ekrani.dart';
+import 'salon_giris_ekrani.dart';
 import '../services/database_service.dart';
 
 class AnaSayfa extends StatefulWidget {
@@ -85,6 +86,18 @@ class _AnaSayfaState extends State<AnaSayfa> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _seciliIndex == 0 ? AppBar(
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.store_rounded, color: Color(0xFF0F172A), size: 20),
+            tooltip: "Salon Girişi",
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalonGirisEkrani())),
+          ),
+        ),
         title: GestureDetector(
           onTap: _sehirSecimiGoster,
           child: Column(
@@ -148,7 +161,7 @@ class AnaSayfaIcerik extends StatelessWidget {
         if (berberler.isEmpty) {
           return Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.storefront_outlined, size: 80, color: Colors.grey),
                 const SizedBox(height: 20),
