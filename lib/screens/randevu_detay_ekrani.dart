@@ -26,6 +26,10 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
 
   List<Map<String, dynamic>> ustalar = [];
   List<Map<String, dynamic>> fiyatListesi = [];
+  List<String> doluSaatler = [];
+  Map<String, int> gunlukRandevuSayilari = {};
+
+  final List<String> saatler = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"];
 
   @override
   void initState() {
@@ -48,7 +52,32 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
     }
   }
 
-  final List<String> saatler = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"];
+  Future<void> _dolulukBilgileriniGuncelle() async {
+    if (seciliUstaData == null) return;
+    
+    // Tüm günlerin doluluk oranlarını al
+    final oranlar = await _dbService.dolulukOranlariniGetir(
+      widget.berber['isim'], 
+      seciliUstaData!['isim']
+    );
+
+    setState(() {
+      gunlukRandevuSayilari = oranlar;
+    });
+
+    // Eğer bir tarih seçiliyse, o günün dolu saatlerini çek
+    if (seciliTarih != null) {
+      String tStr = DateFormat('dd.MM.yyyy').format(seciliTarih!);
+      final dolu = await _dbService.doluSaatleriGetir(
+        widget.berber['isim'], 
+        seciliUstaData!['isim'], 
+        tStr
+      );
+      setState(() {
+        doluSaatler = dolu;
+      });
+    }
+  }
 
   void _hizmetGuncelle(String h, int f) {
     setState(() { 
@@ -76,7 +105,7 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverAppBar(
-            expandedHeight: 250.0, // Yükseklik 300'den 250'ye düşürüldü
+            expandedHeight: 250.0,
             pinned: true,
             stretch: true,
             backgroundColor: const Color(0xFF4E342E),
@@ -115,7 +144,7 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                 borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25), // Padding esnetildi
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -162,11 +191,22 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
 
                     if (seciliUstaData != null) ...[
                       const SizedBox(height: 30),
-                      const Text("Randevu Tarihi", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Randevu Tarihi", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          _bilgiLegend(),
+                        ],
+                      ),
                       const SizedBox(height: 15),
                       _takvimOlustur(),
-                      const SizedBox(height: 25),
-                      _saatOlustur(),
+                      
+                      if (seciliTarih != null) ...[
+                        const SizedBox(height: 25),
+                        const Text("Randevu Saati", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 15),
+                        _saatOlustur(),
+                      ],
                     ],
 
                     const SizedBox(height: 30),
@@ -190,9 +230,21 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
     );
   }
 
+  Widget _bilgiLegend() {
+    return Row(
+      children: [
+        _dot(Colors.green), const SizedBox(width: 4), const Text("Müsait", style: TextStyle(fontSize: 9, color: Colors.grey)),
+        const SizedBox(width: 8),
+        _dot(Colors.red), const SizedBox(width: 4), const Text("Dolu", style: TextStyle(fontSize: 9, color: Colors.grey)),
+      ],
+    );
+  }
+
+  Widget _dot(Color c) => Container(width: 6, height: 6, decoration: BoxDecoration(color: c, shape: BoxShape.circle));
+
   Widget _ustaListesi(String? enIyiUsta, double enY) {
     return SizedBox(
-      height: 110, // Yükseklik 120'den 110'a çekildi
+      height: 110,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: ustalar.length,
@@ -201,7 +253,14 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
           bool isS = seciliUstaData?['isim'] == u['isim']; 
           bool isK = u['isim'] == enIyiUsta && enY > 0;
           return GestureDetector(
-            onTap: () => setState(() { seciliUstaData = u; seciliTarih = null; seciliSaat = null; }),
+            onTap: () {
+              setState(() { 
+                seciliUstaData = u; 
+                seciliTarih = null; 
+                seciliSaat = null; 
+              });
+              _dolulukBilgileriniGuncelle();
+            },
             child: Container(
               width: 80, 
               margin: const EdgeInsets.only(right: 15), 
@@ -233,55 +292,48 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
     );
   }
 
-  Widget _hizmetListesi() {
-    return Column(
-      children: fiyatListesi.map((h) {
-        bool isS = seciliHizmetler.contains(h['isim']);
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: isS ? const Color(0xFF4E342E) : Colors.transparent, width: 1.5),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5)]
-          ),
-          child: CheckboxListTile(
-            activeColor: const Color(0xFF4E342E),
-            dense: true,
-            checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-            title: Text(h['isim'] ?? "", style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-            subtitle: Text("${h['fiyat']} TL", style: const TextStyle(color: Color(0xFF4E342E), fontWeight: FontWeight.bold, fontSize: 13)),
-            value: isS,
-            onChanged: (v) => _hizmetGuncelle(h['isim'], (h['fiyat'] as num).toInt()),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
   Widget _takvimOlustur() {
-    return SizedBox(height: 70, child: ListView.builder(scrollDirection: Axis.horizontal, itemCount: 14, itemBuilder: (c, i) {
+    return SizedBox(height: 75, child: ListView.builder(scrollDirection: Axis.horizontal, itemCount: 14, itemBuilder: (c, i) {
       DateTime d = DateTime.now().add(Duration(days: i)); 
+      String dStr = DateFormat('dd.MM.yyyy').format(d);
       bool isS = seciliTarih?.day == d.day;
+      
+      int count = gunlukRandevuSayilari[dStr] ?? 0;
+      double doluluk = count / saatler.length;
+      
+      Color statusColor = Colors.green;
+      if (doluluk >= 1.0) statusColor = Colors.red;
+      else if (doluluk >= 0.7) statusColor = Colors.orange.shade800;
+      else if (doluluk >= 0.3) statusColor = Colors.orange;
+
       return GestureDetector(
-        onTap: () => setState(() { seciliTarih = d; seciliSaat = null; }), 
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 55, 
-          margin: const EdgeInsets.only(right: 12), 
-          decoration: BoxDecoration(
-            color: isS ? const Color(0xFF4E342E) : Colors.white, 
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5)]
-          ), 
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center, 
-            children: [
-              Text(DateFormat('E', 'tr_TR').format(d), style: TextStyle(color: isS ? Colors.white70 : Colors.grey, fontSize: 10)),
-              const SizedBox(height: 3),
-              Text(d.day.toString(), style: TextStyle(color: isS ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16))
-            ]
-          )
+        onTap: doluluk >= 1.0 ? null : () {
+          setState(() { seciliTarih = d; seciliSaat = null; });
+          _dolulukBilgileriniGuncelle();
+        }, 
+        child: Opacity(
+          opacity: doluluk >= 1.0 ? 0.5 : 1.0,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 55, 
+            margin: const EdgeInsets.only(right: 12), 
+            decoration: BoxDecoration(
+              color: isS ? const Color(0xFF4E342E) : Colors.white, 
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: isS ? Colors.transparent : statusColor.withOpacity(0.5), width: 1.5),
+              boxShadow: [BoxShadow(color: statusColor.withOpacity(0.1), blurRadius: 5)]
+            ), 
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center, 
+              children: [
+                Text(DateFormat('E', 'tr_TR').format(d), style: TextStyle(color: isS ? Colors.white70 : Colors.grey, fontSize: 10)),
+                const SizedBox(height: 3),
+                Text(d.day.toString(), style: TextStyle(color: isS ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 3),
+                Container(width: 4, height: 4, decoration: BoxDecoration(color: isS ? Colors.white54 : statusColor, shape: BoxShape.circle)),
+              ]
+            )
+          ),
         )
       );
     }));
@@ -293,18 +345,25 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
       runSpacing: 8, 
       children: saatler.map((s) { 
         bool isS = seciliSaat == s; 
+        bool isDolu = doluSaatler.contains(s);
+        
         return GestureDetector(
-          onTap: () => setState(() => seciliSaat = s),
+          onTap: isDolu ? null : () => setState(() => seciliSaat = s),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isS ? const Color(0xFF4E342E) : Colors.white,
+              color: isDolu ? Colors.red.withOpacity(0.1) : (isS ? const Color(0xFF4E342E) : Colors.white),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: isS ? const Color(0xFF4E342E) : Colors.transparent),
+              border: Border.all(color: isDolu ? Colors.red.withOpacity(0.3) : (isS ? const Color(0xFF4E342E) : Colors.transparent)),
               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5)]
             ),
-            child: Text(s, style: TextStyle(color: isS ? Colors.white : Colors.black, fontSize: 12, fontWeight: isS ? FontWeight.bold : FontWeight.normal)),
+            child: Text(s, style: TextStyle(
+              color: isDolu ? Colors.red : (isS ? Colors.white : Colors.black), 
+              fontSize: 12, 
+              fontWeight: isS ? FontWeight.bold : FontWeight.normal,
+              decoration: isDolu ? TextDecoration.lineThrough : null,
+            )),
           ),
         );
       }).toList()
@@ -346,6 +405,32 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _hizmetListesi() {
+    return Column(
+      children: fiyatListesi.map((h) {
+        bool isS = seciliHizmetler.contains(h['isim']);
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: isS ? const Color(0xFF4E342E) : Colors.transparent, width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5)]
+          ),
+          child: CheckboxListTile(
+            activeColor: const Color(0xFF4E342E),
+            dense: true,
+            checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+            title: Text(h['isim'] ?? "", style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: Text("${h['fiyat']} TL", style: const TextStyle(color: Color(0xFF4E342E), fontWeight: FontWeight.bold, fontSize: 13)),
+            value: isS,
+            onChanged: (v) => _hizmetGuncelle(h['isim'], (h['fiyat'] as num).toInt()),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -410,7 +495,7 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
         padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom),
         child: Container(
           padding: const EdgeInsets.all(25),
-          child: SingleChildScrollView( // Klavye açıldığında taşmayı önlemek için eklendi
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min, 
               children: [

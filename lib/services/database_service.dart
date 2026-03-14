@@ -18,8 +18,6 @@ class DatabaseService {
       Reference ref = _storage.ref().child('users/$telefon/$fileName');
       await ref.putFile(file);
       String url = await ref.getDownloadURL();
-      
-      // Kullanıcıyı telefonla bul ve resmini güncelle
       var snap = await _db.collection('users').where('telefon', isEqualTo: telefon.trim()).get();
       if (snap.docs.isNotEmpty) {
         await snap.docs.first.reference.update({'profilResmi': url});
@@ -31,7 +29,7 @@ class DatabaseService {
     }
   }
 
-  // --- KULLANICI İŞLEMLERİ (İSİM ÖNCE GÖRÜNECEK ŞEKİLDE) ---
+  // --- KULLANICI İŞLEMLERİ ---
   Future<void> kullaniciKaydet({
     required String adSoyad, 
     required String telefon, 
@@ -44,22 +42,15 @@ class DatabaseService {
   }) async {
     final String cleanPhone = telefon.trim();
     final String newDocId = "$adSoyad ($cleanPhone)";
-
-    // Önce bu telefona sahip eski bir döküman var mı kontrol et (ID değişmiş olabilir)
     var existingDocs = await _db.collection('users').where('telefon', isEqualTo: cleanPhone).get();
-    
     for (var doc in existingDocs.docs) {
-      if (doc.id != newDocId) {
-        await doc.reference.delete(); // Eski isimle kayıtlı dökümanı sil
-      }
+      if (doc.id != newDocId) await doc.reference.delete();
     }
-
     Map<String, dynamic> data = {
       'adSoyad': adSoyad,
       'telefon': cleanPhone,
       'sonGuncelleme': FieldValue.serverTimestamp(),
     };
-    
     if (yeniKayit) {
       data['profilResmi'] = "";
       data['dogumTarihi'] = "";
@@ -75,17 +66,15 @@ class DatabaseService {
       if (sehir != null) data['sehir'] = sehir;
       if (email != null) data['email'] = email;
     }
-
     await _db.collection('users').doc(newDocId).set(data, SetOptions(merge: true));
   }
 
   Future<Map<String, dynamic>?> kullaniciGetir(String t) async {
-    // ID değişebileceği için artık telefon alanı üzerinden sorgu yapıyoruz
     var s = await _db.collection('users').where('telefon', isEqualTo: t.trim()).limit(1).get();
     return s.docs.isNotEmpty ? s.docs.first.data() : null;
   }
 
-  // --- RANDEVU İŞLEMLERİ ---
+  // --- RANDEVU İŞLEMLERİ (DOLULUK KONTROLÜ EKLENDİ) ---
   Future<void> randevuOlustur({required String musteriTelefon, required String berberIsmi, required String ustaIsmi, required String tarih, required String saat, required String kisiTuru, required String musteriAd}) async {
     await _db.collection('randevular').add({
       'musteriTelefon': musteriTelefon.trim(), 
@@ -102,11 +91,43 @@ class DatabaseService {
     });
   }
 
+  // Belirli bir usta ve gün için dolu saatleri getirir
+  Future<List<String>> doluSaatleriGetir(String berberIsmi, String ustaIsmi, String tarih) async {
+    var snap = await _db.collection('randevular')
+        .where('berberIsmi', isEqualTo: berberIsmi)
+        .where('ustaIsmi', isEqualTo: ustaIsmi)
+        .where('tarih', isEqualTo: tarih)
+        .where('durum', isEqualTo: 'aktif')
+        .get();
+    
+    return snap.docs.map((d) => d['saat'].toString()).toList();
+  }
+
+  // Belirli bir usta için önümüzdeki 14 günün doluluk oranlarını getirir
+  Future<Map<String, int>> dolulukOranlariniGetir(String berberIsmi, String ustaIsmi) async {
+    var snap = await _db.collection('randevular')
+        .where('berberIsmi', isEqualTo: berberIsmi)
+        .where('ustaIsmi', isEqualTo: ustaIsmi)
+        .where('durum', isEqualTo: 'aktif')
+        .get();
+    
+    Map<String, int> counts = {};
+    for (var doc in snap.docs) {
+      String t = doc['tarih'];
+      counts[t] = (counts[t] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   Future<List<Map<String, dynamic>>> musterininRandevulariniGetir(String t) async {
     var s = await _db.collection('randevular').where('musteriTelefon', isEqualTo: t.trim()).get();
     var l = s.docs.map((d) => {...d.data(), 'id': d.id}).toList();
     l.sort((a, b) => ((b['olusturmaTarihi'] as Timestamp?) ?? Timestamp.now()).compareTo((a['olusturmaTarihi'] as Timestamp?) ?? Timestamp.now()));
     return l;
+  }
+
+  Future<void> randevuSil(String id) async {
+    await _db.collection('randevular').doc(id).delete();
   }
 
   Future<int> aktifRandevuSayisi(String t) async {
@@ -165,11 +186,9 @@ class DatabaseService {
   Future<void> _puanlariHesaplaVeGuncelle(String salonIsmi, String ustaIsmi) async {
     var tumYorumlar = await _db.collection('yorumlar').where('salonIsmi', isEqualTo: salonIsmi).get();
     if (tumYorumlar.docs.isEmpty) return;
-
     double sTop = 0;
     for (var d in tumYorumlar.docs) sTop += (d['salonPuan'] as num).toDouble();
     double sYeni = double.parse((sTop / tumYorumlar.docs.length).toStringAsFixed(1));
-
     var uYorumlar = tumYorumlar.docs.where((d) => d['ustaIsmi'] == ustaIsmi).toList();
     double uYeni = 5.0;
     if (uYorumlar.isNotEmpty) {
@@ -177,7 +196,6 @@ class DatabaseService {
       for (var d in uYorumlar) uTop += (d['ustaPuan'] as num).toDouble();
       uYeni = double.parse((uTop / uYorumlar.length).toStringAsFixed(1));
     }
-
     var sSnap = await _db.collection('salonlar').where('isim', isEqualTo: salonIsmi).limit(1).get();
     if (sSnap.docs.isNotEmpty) {
       var sData = sSnap.docs.first.data();
