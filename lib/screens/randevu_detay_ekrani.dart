@@ -71,7 +71,7 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5), // Sayfa Arka Planı Gri Tonu
+      backgroundColor: const Color(0xFFF0F2F5),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -110,7 +110,7 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
           SliverToBoxAdapter(
             child: Container(
               decoration: const BoxDecoration(
-                color: Color(0xFFF0F2F5), // İçerik Arka Planı da Gri
+                color: Color(0xFFF0F2F5),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
               ),
               child: Padding(
@@ -118,7 +118,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // SALON BİLGİSİ KARTI
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
@@ -370,6 +369,10 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
   }
 
   void _onayaGonder(String t, String n) async {
+    if (t.length != 11 || !t.startsWith('0')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen 05xx xxx xx xx formatında 11 haneli numaranızı girin.")));
+      return;
+    }
     int sayi = await _dbService.aktifRandevuSayisi(t);
     if (sayi >= 5) { 
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Çok fazla aktif randevunuz var."))); 
@@ -389,7 +392,7 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
 
   void _misafirPopup(Function(String, String) o) {
     final nC = TextEditingController(); final pC = TextEditingController();
-    showModalBottomSheet(context: context, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))), builder: (c) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom + 20, left: 30, right: 30, top: 30), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text("Hızlı Randevu", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 10), const Text("Randevu detaylarını sms ile ileteceğiz.", style: TextStyle(color: Colors.grey)), const SizedBox(height: 25), TextField(controller: nC, decoration: InputDecoration(hintText: "Ad Soyad", filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none))), const SizedBox(height: 15), TextField(controller: pC, keyboardType: TextInputType.phone, decoration: InputDecoration(hintText: "Telefon", filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none))), const SizedBox(height: 30), ElevatedButton(onPressed: () { Navigator.pop(c); o(nC.text, pC.text); }, child: const Text("DEVAM ET"))])));
+    showModalBottomSheet(context: context, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))), builder: (c) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom + 20, left: 30, right: 30, top: 30), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text("Hızlı Randevu", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 10), const Text("Randevu detaylarını sms ile ileteceğiz.", style: TextStyle(color: Colors.grey)), const SizedBox(height: 25), TextField(controller: nC, inputFormatters: [LengthLimitingTextInputFormatter(40)], decoration: InputDecoration(hintText: "Ad Soyad", filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none))), const SizedBox(height: 15), TextField(controller: pC, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)], decoration: InputDecoration(hintText: "Telefon (05xx...)", filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none))), const SizedBox(height: 30), ElevatedButton(onPressed: () { if(nC.text.length < 3 || pC.text.length != 11) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen bilgileri tam ve doğru girin."))); return; } Navigator.pop(c); o(nC.text, pC.text); }, child: const Text("DEVAM ET"))])));
   }
 }
 
