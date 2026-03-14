@@ -51,7 +51,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> with TickerProv
       var ustalarVerisi = widget.berber['ustalar'];
       if (ustalarVerisi is List) {
         ustalar = ustalarVerisi.map((e) => Map<String, dynamic>.from(e)).toList();
-        // PUANA GÖRE SIRALA (EN İYİ EN BAŞA)
         ustalar.sort((a, b) {
           double pA = double.tryParse(a['puan']?.toString() ?? "0") ?? 0;
           double pB = double.tryParse(b['puan']?.toString() ?? "0") ?? 0;
@@ -189,7 +188,7 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> with TickerProv
         itemBuilder: (context, index) {
           final u = ustalar[index]; 
           bool isS = seciliUstaData?['isim'] == u['isim']; 
-          bool isEnIyi = index == 0; // İlk sıradaki en iyidir (sıraladık)
+          bool isEnIyi = index == 0;
           
           return GestureDetector(
             onTap: () {
@@ -204,7 +203,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> with TickerProv
                   Stack(
                     alignment: Alignment.center, 
                     children: [
-                      // HAREKETLİ ÇERÇEVE (SADECE EN İYİ İÇİN)
                       if (isEnIyi)
                         ScaleTransition(
                           scale: Tween(begin: 1.0, end: 1.1).animate(_pulseController),
@@ -217,7 +215,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> with TickerProv
                             ),
                           ),
                         ),
-                      // ANA PROFİL RESMİ
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 300), 
                         padding: const EdgeInsets.all(3), 
@@ -228,7 +225,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> with TickerProv
                         ), 
                         child: CircleAvatar(radius: 30, backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}'))
                       ), 
-                      // MODERN ROZET
                       if (isEnIyi)
                         Positioned(
                           bottom: 0,
@@ -307,8 +303,8 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> with TickerProv
   Widget _yorumlarListesi() => StreamBuilder<List<Map<String, dynamic>>>(stream: _dbService.salonYorumlariniGetir(widget.berber['isim'] ?? ""), builder: (context, snapshot) { if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator()); final yorumlar = snapshot.data ?? []; if (yorumlar.isEmpty) return const Text("Henüz yorum yapılmamış.", style: TextStyle(color: Colors.grey, fontSize: 12)); return ListView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: yorumlar.length, itemBuilder: (context, index) => _YorumKarti(yorum: yorumlar[index])); });
 
   void _randevuSureciniBaslat() async {
-    if (seciliUstaData == null || seciliTarih == null || seciliSaat == null) { 
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen usta, tarih ve saat seçin."))); 
+    if (seciliUstaData == null || seciliTarih == null || seciliSaat == null || seciliHizmetler.isEmpty) { 
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen usta, tarih, saat ve en az bir hizmet seçin."))); 
       return; 
     }
     if (widget.musteriTelefon == null || widget.userName == null) { 
@@ -328,7 +324,21 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> with TickerProv
       showDialog(context: context, builder: (context) => AlertDialog(title: const Text("Randevu Sınırı"), content: const Text("Zaten aktif bir randevunuz bulunuyor. Yeni bir randevu almak için mevcut randevunuzun tamamlanması veya iptal edilmesi gerekmektedir."), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anladım"))]));
       return; 
     }
-    Navigator.push(context, MaterialPageRoute(builder: (c) => SmsOnayEkrani(isLogin: false, berberIsmi: widget.berber['isim'] ?? "", ustaIsmi: seciliUstaData!['isim'], tarih: DateFormat('dd.MM.yyyy').format(seciliTarih!), saat: seciliSaat!, musteriTelefon: t, userName: n, kisiTuru: "Yetişkin")));
+    
+    // YENİ PARAMETRELERLE SMS ONAY EKRANINA GÖNDERİLİYOR
+    Navigator.push(context, MaterialPageRoute(builder: (c) => SmsOnayEkrani(
+      isLogin: false, 
+      salonId: widget.berber['id'],
+      berberIsmi: widget.berber['isim'] ?? "", 
+      ustaIsmi: seciliUstaData!['isim'], 
+      tarih: DateFormat('dd.MM.yyyy').format(seciliTarih!), 
+      saat: seciliSaat!, 
+      musteriTelefon: t, 
+      userName: n, 
+      kisiTuru: "Yetişkin",
+      fiyat: toplamMaliyet.toDouble(),
+      hizmetAdi: seciliHizmetler.join(', '),
+    )));
   }
 
   void _misafirPopup(Function(String, String) o) {

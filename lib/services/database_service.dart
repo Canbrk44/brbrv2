@@ -16,14 +16,22 @@ class DatabaseService {
   // --- PHP SERVER AYARLARI ---
   final String apiBaseUrl = "http://89.252.152.89/api.php"; 
 
-  // --- YAZMA İŞLEMLERİ (PHP SERVER ÜZERİNDEN) ---
+  // --- YAZMA İŞLEMLERİ ---
 
   Future<bool> salonEkleServer(Map<String, dynamic> salonData) async {
     try {
+      final Map<String, dynamic> guncelSalonData = {
+        ...salonData,
+        'puan': 2.0,
+        'ustalar': [],
+        'hizmetler': [],
+        'galeri': [],
+      };
+      
       final response = await http.post(
         Uri.parse('$apiBaseUrl?islem=salon_ekle'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(salonData),
+        body: jsonEncode(guncelSalonData),
       );
       return response.statusCode == 200;
     } catch (e) { return false; }
@@ -31,23 +39,24 @@ class DatabaseService {
 
   Future<bool> ustaEkle(String salonId, Map<String, dynamic> ustaData) async {
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl?islem=usta_ekle'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'salonId': salonId, 'usta': ustaData}),
-      );
-      return response.statusCode == 200;
+      final Map<String, dynamic> guncelUstaData = {
+        ...ustaData,
+        'puan': 2.0,
+      };
+      
+      await _db.collection('salonlar').doc(salonId).set({
+        'ustalar': FieldValue.arrayUnion([guncelUstaData])
+      }, SetOptions(merge: true));
+      return true;
     } catch (e) { return false; }
   }
 
   Future<bool> hizmetEkle(String salonId, Map<String, dynamic> hizmetData) async {
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl?islem=hizmet_ekle'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'salonId': salonId, 'hizmet': hizmetData}),
-      );
-      return response.statusCode == 200;
+      await _db.collection('salonlar').doc(salonId).set({
+        'hizmetler': FieldValue.arrayUnion([hizmetData])
+      }, SetOptions(merge: true));
+      return true;
     } catch (e) { return false; }
   }
 
@@ -62,7 +71,7 @@ class DatabaseService {
     } catch (e) { return false; }
   }
 
-  // --- OKUMA VE DİĞER İŞLEMLER (DİREKT FIRESTORE) ---
+  // --- OKUMA VE DİĞER İŞLEMLER ---
 
   Future<Map<String, dynamic>?> kullaniciGetir(String t) async {
     var s = await _db.collection('users').where('telefon', isEqualTo: t.trim()).limit(1).get();
@@ -70,18 +79,50 @@ class DatabaseService {
   }
 
   Stream<List<Map<String, dynamic>>> salonlariGetir(String sehir) {
-    return _db.collection('salonlar').snapshots().map((sn) => sn.docs.map((d) => {...d.data(), 'id': d.id}).where((s) => (s['sehir'] ?? "").toString().toLowerCase().contains(sehir.split(',')[0].toLowerCase().trim())).toList());
+    return _db.collection('salonlar').snapshots().map((sn) {
+      return sn.docs.map((d) {
+        var data = d.data();
+        return {
+          ...data,
+          'id': d.id,
+          'ustalar': data['ustalar'] ?? [],
+          'hizmetler': data['hizmetler'] ?? [],
+          'galeri': data['galeri'] ?? [],
+          'puan': (data['puan'] ?? 2.0).toDouble(),
+        };
+      }).where((s) {
+        if (sehir.isEmpty || sehir.contains("aranıyor")) return true;
+        String salonSehir = (s['sehir'] ?? "").toString().toLowerCase();
+        String arananSehir = sehir.split(',')[0].toLowerCase().trim();
+        return salonSehir.contains(arananSehir) || arananSehir.contains(salonSehir);
+      }).toList();
+    });
   }
 
-  Future<void> randevuOlustur({required String musteriTelefon, required String berberIsmi, required String ustaIsmi, required String tarih, required String saat, required String kisiTuru, required String musteriAd}) async {
+  // --- GÜNCELLENEN RANDEVU OLUŞTURMA ---
+  Future<void> randevuOlustur({
+    required String musteriTelefon, 
+    required String musteriAd,
+    required String salonId,
+    required String berberIsmi, 
+    required String ustaIsmi, 
+    required String tarih, 
+    required String saat, 
+    required String kisiTuru,
+    required double fiyat,
+    required String hizmetAdi,
+  }) async {
     await _db.collection('randevular').add({
+      'salonId': salonId,
+      'berberIsmi': berberIsmi,
       'musteriTelefon': musteriTelefon.trim(), 
       'musteriAd': musteriAd, 
-      'berberIsmi': berberIsmi, 
       'ustaIsmi': ustaIsmi, 
       'tarih': tarih, 
       'saat': saat, 
       'kisiTuru': kisiTuru, 
+      'fiyat': fiyat,
+      'hizmet': hizmetAdi,
       'durum': 'aktif', 
       'onayDurumu': 'bekliyor', 
       'oylandi': 0, 
@@ -147,17 +188,35 @@ class DatabaseService {
   Future<void> _puanlariHesaplaVeGuncelle(String salonIsmi, String ustaIsmi) async {
     var yorumlarSnap = await _db.collection('yorumlar').where('salonIsmi', isEqualTo: salonIsmi).get();
     var tumYorumlar = yorumlarSnap.docs;
-    if (tumYorumlar.isEmpty) return;
-    double sT = 0; for (var doc in tumYorumlar) sT += (doc.data()['salonPuan'] as num? ?? 0).toDouble();
-    double sYP = double.parse((sT / tumYorumlar.length).toStringAsFixed(1));
-    var uY = tumYorumlar.where((d) => d.data()['ustaIsmi'] == ustaIsmi).toList();
-    double uYP = 0.0;
-    if (uY.isNotEmpty) { double uT = 0; for (var doc in uY) uT += (doc.data()['ustaPuan'] as num? ?? 0).toDouble(); uYP = double.parse((uT / uY.length).toStringAsFixed(1)); }
-    var sS = await _db.collection('salonlar').where('isim', isEqualTo: salonIsmi).limit(1).get();
-    if (sS.docs.isNotEmpty) {
-      var d = sS.docs.first; List u = List.from(d.data()['ustalar'] ?? []);
-      for (var i = 0; i < u.length; i++) { if (u[i]['isim'] == ustaIsmi) u[i]['puan'] = uYP; }
-      await d.reference.update({'puan': sYP, 'ustalar': u});
+    
+    double salonGenelPuan = 2.0;
+    if (tumYorumlar.isNotEmpty) {
+      double toplam = 0;
+      for (var doc in tumYorumlar) toplam += (doc.data()['salonPuan'] as num? ?? 0).toDouble();
+      salonGenelPuan = double.parse((toplam / tumYorumlar.length).toStringAsFixed(1));
+    }
+
+    var ustaYorumlari = tumYorumlar.where((d) => d.data()['ustaIsmi'] == ustaIsmi).toList();
+    double ustaYeniPuan = 2.0;
+    if (ustaYorumlari.isNotEmpty) {
+      double ustaToplam = 0;
+      for (var doc in ustaYorumlari) ustaToplam += (doc.data()['ustaPuan'] as num? ?? 0).toDouble();
+      ustaYeniPuan = double.parse((ustaToplam / ustaYorumlari.length).toStringAsFixed(1));
+    }
+
+    var salonSnap = await _db.collection('salonlar').where('isim', isEqualTo: salonIsmi).limit(1).get();
+    if (salonSnap.docs.isNotEmpty) {
+      var doc = salonSnap.docs.first;
+      List ustalar = List.from(doc.data()['ustalar'] ?? []);
+      for (var i = 0; i < ustalar.length; i++) {
+        if (ustalar[i]['isim'] == ustaIsmi) {
+          ustalar[i]['puan'] = ustaYeniPuan;
+        }
+      }
+      await doc.reference.update({
+        'puan': salonGenelPuan,
+        'ustalar': ustalar
+      });
     }
   }
 
@@ -176,7 +235,12 @@ class DatabaseService {
   Future<Map<String, dynamic>?> salonGetirByEmail(String e) async {
     var s = await _db.collection('salonlar').where('sahipEmail', isEqualTo: e).limit(1).get();
     if (s.docs.isEmpty) return null;
-    var d = s.docs.first.data(); d['id'] = s.docs.first.id; return d;
+    var d = s.docs.first.data(); d['id'] = s.docs.first.id;
+    d['ustalar'] = d['ustalar'] ?? [];
+    d['hizmetler'] = d['hizmetler'] ?? [];
+    d['galeri'] = d['galeri'] ?? [];
+    d['puan'] = (d['puan'] ?? 2.0).toDouble();
+    return d;
   }
 
   Future<String?> fotografYukle(File file, String salonId) async {

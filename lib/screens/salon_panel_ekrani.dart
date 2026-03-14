@@ -70,6 +70,9 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
       backgroundColor: const Color(0xFFF0F2F5),
       appBar: AppBar(
         title: Text(_salon!['isim'] ?? "Yönetim Paneli", style: const TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _salonBilgileriniGetir)
+        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -357,11 +360,17 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
             onPressed: () async {
               List liste = List.from(isUsta ? _salon!['ustalar'] : _salon!['hizmetler']);
               liste.removeAt(index);
+              
+              // SİLME İŞLEMİ DE ARTIK GÜVENLİ OLMASI İÇİN FIRESTORE ÜZERİNDEN GÜNCELLENİYOR
               await FirebaseFirestore.instance.collection('salonlar').doc(_salon!['id']).update({
                 isUsta ? 'ustalar' : 'hizmetler': liste
               });
-              Navigator.pop(context);
-              _salonBilgileriniGetir();
+              
+              if (mounted) {
+                Navigator.pop(context);
+                _salonBilgileriniGetir();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Başarıyla silindi.")));
+              }
             }, 
             child: const Text("Evet, Sil", style: TextStyle(color: Colors.red))
           ),
@@ -393,15 +402,34 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
           ElevatedButton(
             onPressed: () async {
               if (controller1.text.isEmpty || controller2.text.isEmpty) return;
+              
+              bool basarili = false;
               if (isUstaSecili) {
-                // YENİ USTA BAŞLANGIÇ PUANI 2.0 YAPILDI
-                final yeniUsta = {'isim': controller1.text, 'uzmanlik': controller2.text, 'resim': 'https://i.pravatar.cc/150?u=${controller1.text}', 'puan': 2.0, 'doluSaatler': []};
-                await _db.ustaEkle(_salon!['id'], yeniUsta);
+                final yeniUsta = {
+                  'isim': controller1.text, 
+                  'uzmanlik': controller2.text, 
+                  'resim': 'https://i.pravatar.cc/150?u=${controller1.text}', 
+                  'puan': 2.0, 
+                  'doluSaatler': []
+                };
+                basarili = await _db.ustaEkle(_salon!['id'], yeniUsta);
               } else {
-                final yeniHizmet = {'isim': controller1.text, 'fiyat': int.tryParse(controller2.text) ?? 0};
-                await _db.hizmetEkle(_salon!['id'], yeniHizmet);
+                final yeniHizmet = {
+                  'isim': controller1.text, 
+                  'fiyat': int.tryParse(controller2.text) ?? 0
+                };
+                basarili = await _db.hizmetEkle(_salon!['id'], yeniHizmet);
               }
-              if (mounted) { Navigator.pop(context); _salonBilgileriniGetir(); }
+
+              if (mounted) { 
+                Navigator.pop(context); 
+                if (basarili) {
+                  _salonBilgileriniGetir();
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("İşlem başarıyla tamamlandı.")));
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Bir hata oluştu. Lütfen tekrar deneyin."), backgroundColor: Colors.red));
+                }
+              }
             },
             child: const Text("Kaydet"),
           ),

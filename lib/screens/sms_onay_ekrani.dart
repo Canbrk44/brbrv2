@@ -6,6 +6,7 @@ import 'ana_sayfa.dart';
 
 class SmsOnayEkrani extends StatefulWidget {
   final bool isLogin;
+  final String? salonId; // Yeni eklendi
   final String berberIsmi;
   final String ustaIsmi;
   final String tarih;
@@ -13,10 +14,13 @@ class SmsOnayEkrani extends StatefulWidget {
   final String? musteriTelefon;
   final String? userName;
   final String? kisiTuru;
+  final double? fiyat; // Yeni eklendi
+  final String? hizmetAdi; // Yeni eklendi
 
   const SmsOnayEkrani({
     super.key,
     this.isLogin = false,
+    this.salonId,
     required this.berberIsmi,
     required this.ustaIsmi,
     required this.tarih,
@@ -24,6 +28,8 @@ class SmsOnayEkrani extends StatefulWidget {
     this.musteriTelefon,
     this.userName,
     this.kisiTuru,
+    this.fiyat,
+    this.hizmetAdi,
   });
 
   @override
@@ -48,7 +54,6 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
 
     if (widget.isLogin) {
       if (widget.userName != null && widget.musteriTelefon != null) {
-        // İLK KAYIT/GİRİŞ: Şablonu boş alanlarla oluştur (yeniKayit: true)
         await _dbService.kullaniciKaydet(
           adSoyad: widget.userName!,
           telefon: widget.musteriTelefon!,
@@ -67,15 +72,18 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
         );
       }
     } else {
-      // Randevu oluşturma işlemi
+      // Randevu oluşturma işlemi (GÜNCELLENDİ)
       await _dbService.randevuOlustur(
         musteriTelefon: widget.musteriTelefon ?? "Misafir",
         musteriAd: widget.userName ?? "Misafir",
+        salonId: widget.salonId ?? "",
         berberIsmi: widget.berberIsmi,
         ustaIsmi: widget.ustaIsmi,
         tarih: widget.tarih,
         saat: widget.saat,
         kisiTuru: widget.kisiTuru ?? "Yetişkin",
+        fiyat: widget.fiyat ?? 0,
+        hizmetAdi: widget.hizmetAdi ?? "Hizmet Belirtilmedi",
       );
 
       if (!mounted) return;
