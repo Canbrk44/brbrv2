@@ -181,6 +181,7 @@ class _AnaSayfaIcerikState extends State<AnaSayfaIcerik> with SingleTickerProvid
             if (u is Map) {
               Map<String, dynamic> uData = Map<String, dynamic>.from(u);
               uData['salon'] = b['isim'];
+              uData['salonId'] = b['id'];
               ustalar.add(uData);
             }
           }
@@ -209,6 +210,21 @@ class _AnaSayfaIcerikState extends State<AnaSayfaIcerik> with SingleTickerProvid
                 ),
               ),
               actions: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 20, right: 5),
+                  child: IconButton(
+                    icon: const CircleAvatar(backgroundColor: Colors.white, child: Icon(Icons.search, color: Color(0xFF4E342E), size: 20)),
+                    onPressed: () => showSearch(
+                      context: context, 
+                      delegate: BerberUstaArama(
+                        berberler: berberler, 
+                        ustalar: ustalar, 
+                        tel: widget.musteriTelefon, 
+                        ad: widget.userName
+                      )
+                    ),
+                  ),
+                ),
                 Padding(
                   padding: const EdgeInsets.only(top: 20, right: 10),
                   child: IconButton(
@@ -296,6 +312,63 @@ class _AnaSayfaIcerikState extends State<AnaSayfaIcerik> with SingleTickerProvid
   static Widget _resimKontrol(String? url) {
     if (url == null || url.isEmpty || !url.startsWith('http')) url = defaultSalonImg;
     return Image.network(url, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Image.network(defaultSalonImg, fit: BoxFit.cover));
+  }
+}
+
+class BerberUstaArama extends SearchDelegate {
+  final List<Map<String, dynamic>> berberler;
+  final List<Map<String, dynamic>> ustalar;
+  final String? tel;
+  final String? ad;
+
+  BerberUstaArama({required this.berberler, required this.ustalar, this.tel, this.ad});
+
+  @override
+  String get searchFieldLabel => "Berber veya Usta Ara...";
+
+  @override
+  List<Widget>? buildActions(BuildContext context) => [
+    IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ""),
+  ];
+
+  @override
+  Widget? buildLeading(BuildContext context) => IconButton(
+    icon: const Icon(Icons.arrow_back), 
+    onPressed: () => close(context, null)
+  );
+
+  @override
+  Widget buildResults(BuildContext context) => _aramaSonuclari(context);
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _aramaSonuclari(context);
+
+  Widget _aramaSonuclari(BuildContext context) {
+    final filteredBerberler = berberler.where((b) => (b['isim'] ?? "").toLowerCase().contains(query.toLowerCase())).toList();
+    final filteredUstalar = ustalar.where((u) => (u['isim'] ?? "").toLowerCase().contains(query.toLowerCase())).toList();
+
+    if (query.isEmpty) return const Center(child: Text("Hemen aramaya başla..."));
+    if (filteredBerberler.isEmpty && filteredUstalar.isEmpty) return const Center(child: Text("Sonuç bulunamadı."));
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        if (filteredBerberler.isNotEmpty) ...[
+          const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Text("Salonlar", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+          ...filteredBerberler.map((b) => _NormalSalonKarti(berber: b, tel: tel, ad: ad)),
+        ],
+        if (filteredUstalar.isNotEmpty) ...[
+          const Padding(padding: EdgeInsets.fromLTRB(0, 20, 0, 10), child: Text("Ustalar", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+          ...filteredUstalar.map((u) => ListTile(
+            leading: CircleAvatar(backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150')),
+            title: Text(u['isim'] ?? ""),
+            subtitle: Text(u['salon'] ?? ""),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => UstaDetayEkrani(usta: u, salonIsmi: u['salon'] ?? ""))),
+          )),
+        ],
+      ],
+    );
   }
 }
 

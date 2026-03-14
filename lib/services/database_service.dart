@@ -74,7 +74,7 @@ class DatabaseService {
     return s.docs.isNotEmpty ? s.docs.first.data() : null;
   }
 
-  // --- RANDEVU İŞLEMLERİ (DOLULUK KONTROLÜ EKLENDİ) ---
+  // --- RANDEVU İŞLEMLERİ ---
   Future<void> randevuOlustur({required String musteriTelefon, required String berberIsmi, required String ustaIsmi, required String tarih, required String saat, required String kisiTuru, required String musteriAd}) async {
     await _db.collection('randevular').add({
       'musteriTelefon': musteriTelefon.trim(), 
@@ -89,34 +89,6 @@ class DatabaseService {
       'oylandi': 0, 
       'olusturmaTarihi': FieldValue.serverTimestamp()
     });
-  }
-
-  // Belirli bir usta ve gün için dolu saatleri getirir
-  Future<List<String>> doluSaatleriGetir(String berberIsmi, String ustaIsmi, String tarih) async {
-    var snap = await _db.collection('randevular')
-        .where('berberIsmi', isEqualTo: berberIsmi)
-        .where('ustaIsmi', isEqualTo: ustaIsmi)
-        .where('tarih', isEqualTo: tarih)
-        .where('durum', isEqualTo: 'aktif')
-        .get();
-    
-    return snap.docs.map((d) => d['saat'].toString()).toList();
-  }
-
-  // Belirli bir usta için önümüzdeki 14 günün doluluk oranlarını getirir
-  Future<Map<String, int>> dolulukOranlariniGetir(String berberIsmi, String ustaIsmi) async {
-    var snap = await _db.collection('randevular')
-        .where('berberIsmi', isEqualTo: berberIsmi)
-        .where('ustaIsmi', isEqualTo: ustaIsmi)
-        .where('durum', isEqualTo: 'aktif')
-        .get();
-    
-    Map<String, int> counts = {};
-    for (var doc in snap.docs) {
-      String t = doc['tarih'];
-      counts[t] = (counts[t] ?? 0) + 1;
-    }
-    return counts;
   }
 
   Future<List<Map<String, dynamic>>> musterininRandevulariniGetir(String t) async {
@@ -139,6 +111,30 @@ class DatabaseService {
     return _db.collection('randevular').where('berberIsmi', isEqualTo: s).snapshots().map((sn) => sn.docs.map((d) => {...d.data(), 'id': d.id}).toList());
   }
 
+  Future<List<String>> doluSaatleriGetir(String berberIsmi, String ustaIsmi, String tarih) async {
+    var snap = await _db.collection('randevular')
+        .where('berberIsmi', isEqualTo: berberIsmi)
+        .where('ustaIsmi', isEqualTo: ustaIsmi)
+        .where('tarih', isEqualTo: tarih)
+        .where('durum', isEqualTo: 'aktif')
+        .get();
+    return snap.docs.map((d) => d['saat'].toString()).toList();
+  }
+
+  Future<Map<String, int>> dolulukOranlariniGetir(String berberIsmi, String ustaIsmi) async {
+    var snap = await _db.collection('randevular')
+        .where('berberIsmi', isEqualTo: berberIsmi)
+        .where('ustaIsmi', isEqualTo: ustaIsmi)
+        .where('durum', isEqualTo: 'aktif')
+        .get();
+    Map<String, int> counts = {};
+    for (var doc in snap.docs) {
+      String t = doc['tarih'];
+      counts[t] = (counts[t] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   // --- SALON İŞLEMLERİ ---
   Stream<List<Map<String, dynamic>>> salonlariGetir(String sehir) {
     return _db.collection('salonlar').snapshots().map((sn) => sn.docs.map((d) => {...d.data(), 'id': d.id}).where((s) => (s['sehir'] ?? "").toString().toLowerCase().contains(sehir.split(',')[0].toLowerCase().trim())).toList());
@@ -153,7 +149,7 @@ class DatabaseService {
   Future<void> ustaEkle(String id, Map<String, dynamic> u) async { await _db.collection('salonlar').doc(id).update({'ustalar': FieldValue.arrayUnion([u])}); }
   Future<void> hizmetEkle(String id, Map<String, dynamic> h) async { await _db.collection('salonlar').doc(id).update({'hizmetler': FieldValue.arrayUnion([h])}); }
 
-  // --- YORUM VE PUANLAMA SİSTEMİ ---
+  // --- YORUM VE PUANLAMA SİSTEMİ (ORTALAMA HESAPLAMA DÜZELTİLDİ) ---
   Future<void> yorumKaydet({
     required String randevuId,
     required String ustaIsmi,
@@ -184,26 +180,47 @@ class DatabaseService {
   }
 
   Future<void> _puanlariHesaplaVeGuncelle(String salonIsmi, String ustaIsmi) async {
-    var tumYorumlar = await _db.collection('yorumlar').where('salonIsmi', isEqualTo: salonIsmi).get();
-    if (tumYorumlar.docs.isEmpty) return;
-    double sTop = 0;
-    for (var d in tumYorumlar.docs) sTop += (d['salonPuan'] as num).toDouble();
-    double sYeni = double.parse((sTop / tumYorumlar.docs.length).toStringAsFixed(1));
-    var uYorumlar = tumYorumlar.docs.where((d) => d['ustaIsmi'] == ustaIsmi).toList();
-    double uYeni = 5.0;
-    if (uYorumlar.isNotEmpty) {
-      double uTop = 0;
-      for (var d in uYorumlar) uTop += (d['ustaPuan'] as num).toDouble();
-      uYeni = double.parse((uTop / uYorumlar.length).toStringAsFixed(1));
+    // 1. O salona ait tüm yorumları çek
+    var yorumlarSnap = await _db.collection('yorumlar').where('salonIsmi', isEqualTo: salonIsmi).get();
+    var tumYorumlar = yorumlarSnap.docs;
+    
+    if (tumYorumlar.isEmpty) return;
+
+    // 2. Salon Genel Ortalaması Hesapla
+    double sToplam = 0;
+    for (var doc in tumYorumlar) {
+      sToplam += (doc.data()['salonPuan'] as num? ?? 0).toDouble();
     }
-    var sSnap = await _db.collection('salonlar').where('isim', isEqualTo: salonIsmi).limit(1).get();
-    if (sSnap.docs.isNotEmpty) {
-      var sData = sSnap.docs.first.data();
-      List ustalar = List.from(sData['ustalar'] ?? []);
-      for (var i = 0; i < ustalar.length; i++) {
-        if (ustalar[i]['isim'] == ustaIsmi) ustalar[i]['puan'] = uYeni;
+    double sYeniPuan = double.parse((sToplam / tumYorumlar.length).toStringAsFixed(1));
+
+    // 3. Spesifik Usta Ortalaması Hesapla
+    var ustaYorumlar = tumYorumlar.where((d) => d.data()['ustaIsmi'] == ustaIsmi).toList();
+    double uYeniPuan = 0.0;
+    
+    if (ustaYorumlar.isNotEmpty) {
+      double uToplam = 0;
+      for (var doc in ustaYorumlar) {
+        uToplam += (doc.data()['ustaPuan'] as num? ?? 0).toDouble();
       }
-      await _db.collection('salonlar').doc(sSnap.docs.first.id).update({'puan': sYeni, 'ustalar': ustalar});
+      uYeniPuan = double.parse((uToplam / ustaYorumlar.length).toStringAsFixed(1));
+    }
+
+    // 4. Salon dökümanındaki puanları güncelle
+    var salonSnap = await _db.collection('salonlar').where('isim', isEqualTo: salonIsmi).limit(1).get();
+    if (salonSnap.docs.isNotEmpty) {
+      var doc = salonSnap.docs.first;
+      List ustalar = List.from(doc.data()['ustalar'] ?? []);
+      
+      for (var i = 0; i < ustalar.length; i++) {
+        if (ustalar[i]['isim'] == ustaIsmi) {
+          ustalar[i]['puan'] = uYeniPuan;
+        }
+      }
+      
+      await doc.reference.update({
+        'puan': sYeniPuan,
+        'ustalar': ustalar
+      });
     }
   }
 

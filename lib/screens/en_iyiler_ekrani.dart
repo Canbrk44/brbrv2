@@ -35,11 +35,11 @@ class _EnIyilerEkraniState extends State<EnIyilerEkrani> with TickerProviderStat
 
   Future<Map<String, List<Map<String, dynamic>>>> _getEnIyilerFirebase() async {
     try {
+      // SALONLAR: 4.0 barajını kaldırıp sadece puana göre sıralıyoruz
       final salonlarSnapshot = await _firestore
           .collection('salonlar')
-          .where('puan', isGreaterThanOrEqualTo: 4.0)
           .orderBy('puan', descending: true)
-          .limit(10)
+          .limit(15)
           .get();
 
       List<Map<String, dynamic>> enIyiSalonlar = salonlarSnapshot.docs.map((doc) {
@@ -64,15 +64,18 @@ class _EnIyilerEkraniState extends State<EnIyilerEkrani> with TickerProviderStat
         }
       }
 
-      enIyiUstalar.sort((a, b) => (double.tryParse(b['puan']?.toString() ?? "0") ?? 0)
-          .compareTo(double.tryParse(a['puan']?.toString() ?? "0") ?? 0));
+      enIyiUstalar.sort((a, b) {
+        double pA = double.tryParse(a['puan']?.toString() ?? "0") ?? 0;
+        double pB = double.tryParse(b['puan']?.toString() ?? "0") ?? 0;
+        return pB.compareTo(pA);
+      });
 
       return {
         'salonlar': enIyiSalonlar,
         'ustalar': enIyiUstalar.take(15).toList(),
       };
     } catch (e) {
-      debugPrint("Hata: $e");
+      debugPrint("En İyiler Getirme Hatası: $e");
       return {'salonlar': [], 'ustalar': []};
     }
   }
@@ -85,7 +88,7 @@ class _EnIyilerEkraniState extends State<EnIyilerEkrani> with TickerProviderStat
         future: _getEnIyilerFirebase(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF4E342E)));
           }
 
           final data = snapshot.data ?? {'salonlar': [], 'ustalar': []};
@@ -96,36 +99,17 @@ class _EnIyilerEkraniState extends State<EnIyilerEkrani> with TickerProviderStat
             physics: const BouncingScrollPhysics(),
             slivers: [
               SliverAppBar(
-                expandedHeight: 250.0,
+                expandedHeight: 220.0,
                 pinned: true,
                 backgroundColor: const Color(0xFF4E342E),
                 flexibleSpace: FlexibleSpaceBar(
                   centerTitle: true,
-                  title: const Text(
-                    "En İyiler", 
-                    style: TextStyle(
-                      color: Colors.white, 
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      shadows: [Shadow(color: Colors.black45, blurRadius: 10)]
-                    )
-                  ),
+                  title: const Text("En İyiler", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18, shadows: [Shadow(color: Colors.black45, blurRadius: 10)])),
                   background: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.network(
-                        'https://images.pexels.com/photos/1319461/pexels-photo-1319461.jpeg', 
-                        fit: BoxFit.cover
-                      ),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Colors.black87],
-                          ),
-                        ),
-                      ),
+                      Image.network('https://images.pexels.com/photos/1319461/pexels-photo-1319461.jpeg', fit: BoxFit.cover),
+                      const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black87]))),
                     ],
                   ),
                 ),
@@ -138,22 +122,28 @@ class _EnIyilerEkraniState extends State<EnIyilerEkrani> with TickerProviderStat
                     children: [
                       const _Baslik(yazi: "En İyi Salonlar"),
                       const SizedBox(height: 15),
-                      SizedBox(
-                        height: 280,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: salonlar.length,
-                          itemBuilder: (context, index) => _SalonCard(s: salonlar[index], tel: widget.musteriTelefon, ad: widget.userName),
+                      if (salonlar.isEmpty)
+                        const Center(child: Text("Şu an listelenecek salon bulunamadı.", style: TextStyle(color: Colors.grey)))
+                      else
+                        SizedBox(
+                          height: 280,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: salonlar.length,
+                            itemBuilder: (context, index) => _SalonCard(s: salonlar[index], tel: widget.musteriTelefon, ad: widget.userName),
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 40),
                       const _Baslik(yazi: "En İyi Ustalar"),
                       const SizedBox(height: 15),
-                      ...List.generate(ustalar.length, (index) => _UstaCard(
-                        u: ustalar[index], 
-                        isTop: index == 0,
-                        glowAnimation: _glowController,
-                      )),
+                      if (ustalar.isEmpty)
+                        const Center(child: Text("Şu an listelenecek usta bulunamadı.", style: TextStyle(color: Colors.grey)))
+                      else
+                        ...List.generate(ustalar.length, (index) => _UstaCard(
+                          u: ustalar[index], 
+                          isTop: index == 0,
+                          glowAnimation: _glowController,
+                        )),
                       const SizedBox(height: 100),
                     ],
                   ),
@@ -272,14 +262,8 @@ class _UstaCard extends StatelessWidget {
               Stack(
                 alignment: Alignment.topRight,
                 children: [
-                  CircleAvatar(
-                    radius: 38, 
-                    backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}')
-                  ),
-                  const Positioned(
-                    top: -5, right: -5,
-                    child: Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 28),
-                  ),
+                  CircleAvatar(radius: 38, backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}')),
+                  const Positioned(top: -5, right: -5, child: Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 28)),
                 ],
               ),
               const SizedBox(width: 20),
@@ -287,13 +271,7 @@ class _UstaCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start, 
                   children: [
-                    Row(
-                      children: [
-                        Text(u['isim'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.verified, color: Colors.blue, size: 16),
-                      ],
-                    ), 
+                    Row(children: [Text(u['isim'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)), const SizedBox(width: 8), const Icon(Icons.verified, color: Colors.blue, size: 16)]), 
                     Text(u['salon'] ?? "", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                     const SizedBox(height: 5),
                     const Text("Şampiyon Usta", style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
@@ -303,12 +281,7 @@ class _UstaCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), 
                 decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(12)), 
-                child: Row(
-                  children: [
-                    const Icon(Icons.star_rounded, color: Colors.white, size: 18), 
-                    Text(" ${u['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white))
-                  ]
-                )
+                child: Row(children: [const Icon(Icons.star_rounded, color: Colors.white, size: 18), Text(" ${u['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white))])
               ),
             ],
           ),
@@ -321,17 +294,10 @@ class _UstaCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white, 
-        borderRadius: BorderRadius.circular(22), 
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 32, 
-            backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}')
-          ),
+          CircleAvatar(radius: 32, backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}')),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
@@ -345,12 +311,7 @@ class _UstaCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), 
             decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), 
-            child: Row(
-              children: [
-                const Icon(Icons.star_rounded, color: Colors.amber, size: 16), 
-                Text(" ${u['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amber))
-              ]
-            )
+            child: Row(children: [const Icon(Icons.star_rounded, color: Colors.amber, size: 16), Text(" ${u['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amber))])
           ),
         ],
       ),

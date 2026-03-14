@@ -25,7 +25,7 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this); // 5 Sekme (Galeri Eklendi)
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() => setState(() {}));
     _salonBilgileriniGetir();
   }
@@ -50,9 +50,7 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     if (image != null) {
       showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator()));
-      
       String? url = await _db.fotografYukle(File(image.path), _salon!['id']);
-      
       if (mounted) {
         Navigator.pop(context);
         if (url != null) {
@@ -77,7 +75,7 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
           isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.analytics_rounded), text: "Analiz"),
-            Tab(icon: Icon(Icons.photo_library_rounded), text: "Galeri"), // YENİ
+            Tab(icon: Icon(Icons.photo_library_rounded), text: "Galeri"),
             Tab(icon: Icon(Icons.people_alt_rounded), text: "Müşteriler"),
             Tab(icon: Icon(Icons.person_pin_rounded), text: "Ustalar"),
             Tab(icon: Icon(Icons.content_cut_rounded), text: "Hizmetler"),
@@ -88,7 +86,7 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
         controller: _tabController,
         children: [
           _istatistikSekmesi(),
-          _galeriSekmesi(), // YENİ
+          _galeriSekmesi(),
           _musterilerSekmesi(),
           _ustalarSekmesi(),
           _hizmetlerSekmesi(),
@@ -396,7 +394,8 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
             onPressed: () async {
               if (controller1.text.isEmpty || controller2.text.isEmpty) return;
               if (isUstaSecili) {
-                final yeniUsta = {'isim': controller1.text, 'uzmanlik': controller2.text, 'resim': 'https://i.pravatar.cc/150?u=${controller1.text}', 'puan': 5.0, 'doluSaatler': []};
+                // YENİ USTA BAŞLANGIÇ PUANI 2.0 YAPILDI
+                final yeniUsta = {'isim': controller1.text, 'uzmanlik': controller2.text, 'resim': 'https://i.pravatar.cc/150?u=${controller1.text}', 'puan': 2.0, 'doluSaatler': []};
                 await _db.ustaEkle(_salon!['id'], yeniUsta);
               } else {
                 final yeniHizmet = {'isim': controller1.text, 'fiyat': int.tryParse(controller2.text) ?? 0};

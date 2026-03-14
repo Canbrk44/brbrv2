@@ -16,7 +16,7 @@ class RandevuDetayEkrani extends StatefulWidget {
   _RandevuDetayEkraniState createState() => _RandevuDetayEkraniState();
 }
 
-class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
+class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> with TickerProviderStateMixin {
   DateTime? seciliTarih;
   Map<String, dynamic>? seciliUstaData;
   String? seciliSaat;
@@ -28,13 +28,22 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
   List<Map<String, dynamic>> fiyatListesi = [];
   List<String> doluSaatler = [];
   Map<String, int> gunlukRandevuSayilari = {};
+  
+  late AnimationController _pulseController;
 
   final List<String> saatler = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"];
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _verileriHazirla();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
   }
 
   void _verileriHazirla() {
@@ -42,6 +51,12 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
       var ustalarVerisi = widget.berber['ustalar'];
       if (ustalarVerisi is List) {
         ustalar = ustalarVerisi.map((e) => Map<String, dynamic>.from(e)).toList();
+        // PUANA GÖRE SIRALA (EN İYİ EN BAŞA)
+        ustalar.sort((a, b) {
+          double pA = double.tryParse(a['puan']?.toString() ?? "0") ?? 0;
+          double pB = double.tryParse(b['puan']?.toString() ?? "0") ?? 0;
+          return pB.compareTo(pA);
+        });
       }
       var hizmetVerisi = widget.berber['hizmetler'] ?? [];
       if (hizmetVerisi is List) {
@@ -72,12 +87,6 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
 
   @override
   Widget build(BuildContext context) {
-    String? enIyiUsta; double enY = -1.0;
-    for (var u in ustalar) { 
-      double p = double.tryParse(u['puan']?.toString() ?? "0") ?? 0; 
-      if (p > enY) { enY = p; enIyiUsta = u['isim']; } 
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
       body: CustomScrollView(
@@ -111,30 +120,11 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(widget.berber['isim'] ?? "", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                const SizedBox(height: 5),
-                                Row(children: [const Icon(Icons.location_on, size: 14, color: Colors.grey), const SizedBox(width: 4), Flexible(child: Text(widget.berber['sehir'] ?? "", style: const TextStyle(color: Colors.grey, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis))]),
-                              ],
-                            ),
-                          ),
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Row(children: [const Icon(Icons.star_rounded, color: Colors.amber, size: 16), Text(" ${widget.berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))])),
-                        ],
-                      ),
-                    ),
+                    _ustBaslikKarti(),
                     const SizedBox(height: 30),
                     const Text("Usta Seçin", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 15),
-                    _ustaListesi(enIyiUsta, enY),
+                    _ustaListesiModern(),
                     if (seciliUstaData != null) ...[
                       const SizedBox(height: 30),
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("Randevu Tarihi", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), _bilgiLegend()]),
@@ -167,38 +157,92 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
     );
   }
 
-  Widget _bilgiLegend() => Row(children: [_dot(Colors.green), const SizedBox(width: 4), const Text("Müsait", style: TextStyle(fontSize: 9, color: Colors.grey)), const SizedBox(width: 8), _dot(Colors.red), const SizedBox(width: 4), const Text("Dolu", style: TextStyle(fontSize: 9, color: Colors.grey))]);
-  Widget _dot(Color c) => Container(width: 6, height: 6, decoration: BoxDecoration(color: c, shape: BoxShape.circle));
+  Widget _ustBaslikKarti() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.berber['isim'] ?? "", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 5),
+                Row(children: [const Icon(Icons.location_on, size: 14, color: Colors.grey), const SizedBox(width: 4), Flexible(child: Text(widget.berber['sehir'] ?? "", style: const TextStyle(color: Colors.grey, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis))]),
+              ],
+            ),
+          ),
+          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Row(children: [const Icon(Icons.star_rounded, color: Colors.amber, size: 16), Text(" ${widget.berber['puan'] ?? '0.0'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))])),
+        ],
+      ),
+    );
+  }
 
-  Widget _ustaListesi(String? enIyiUsta, double enY) {
+  Widget _ustaListesiModern() {
     return SizedBox(
-      height: 110,
+      height: 130,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: ustalar.length,
         itemBuilder: (context, index) {
           final u = ustalar[index]; 
           bool isS = seciliUstaData?['isim'] == u['isim']; 
-          bool isK = u['isim'] == enIyiUsta && enY > 0;
+          bool isEnIyi = index == 0; // İlk sıradaki en iyidir (sıraladık)
+          
           return GestureDetector(
             onTap: () {
               setState(() { seciliUstaData = u; seciliTarih = null; seciliSaat = null; });
               _dolulukBilgileriniGuncelle();
             },
             child: Container(
-              width: 80, 
+              width: 90, 
               margin: const EdgeInsets.only(right: 15), 
               child: Column(
                 children: [
                   Stack(
                     alignment: Alignment.center, 
                     children: [
-                      AnimatedContainer(duration: const Duration(milliseconds: 300), padding: const EdgeInsets.all(2), decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: isS ? const Color(0xFF4E342E) : Colors.transparent, width: 2)), child: CircleAvatar(radius: 30, backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}'))), 
-                      if (isK) const Positioned(top: 0, right: 0, child: Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 20))
+                      // HAREKETLİ ÇERÇEVE (SADECE EN İYİ İÇİN)
+                      if (isEnIyi)
+                        ScaleTransition(
+                          scale: Tween(begin: 1.0, end: 1.1).animate(_pulseController),
+                          child: Container(
+                            width: 72, height: 72,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const SweepGradient(colors: [Colors.amber, Colors.orange, Colors.amber]),
+                              boxShadow: [BoxShadow(color: Colors.amber.withOpacity(0.3), blurRadius: 15, spreadRadius: 2)]
+                            ),
+                          ),
+                        ),
+                      // ANA PROFİL RESMİ
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300), 
+                        padding: const EdgeInsets.all(3), 
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle, 
+                          color: Colors.white,
+                          border: Border.all(color: isS ? const Color(0xFF4E342E) : Colors.transparent, width: 2.5)
+                        ), 
+                        child: CircleAvatar(radius: 30, backgroundImage: NetworkImage(u['resim'] ?? 'https://i.pravatar.cc/150?u=${u['isim']}'))
+                      ), 
+                      // MODERN ROZET
+                      if (isEnIyi)
+                        Positioned(
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white, width: 1.5)),
+                            child: const Text("POPÜLER", style: TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.bold)),
+                          ),
+                        )
                     ]
                   ), 
-                  const SizedBox(height: 5), 
-                  Text(u['isim'] ?? "", textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: isS ? FontWeight.bold : FontWeight.normal), maxLines: 1, overflow: TextOverflow.ellipsis)
+                  const SizedBox(height: 10), 
+                  Text(u['isim'] ?? "", textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: isS ? FontWeight.bold : FontWeight.w500, color: isS ? const Color(0xFF4E342E) : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text("⭐ ${u['puan'] ?? '0.0'}", style: const TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
                 ]
               )
             ),
@@ -207,6 +251,9 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
       ),
     );
   }
+
+  Widget _bilgiLegend() => Row(children: [_dot(Colors.green), const SizedBox(width: 4), const Text("Müsait", style: TextStyle(fontSize: 9, color: Colors.grey)), const SizedBox(width: 8), _dot(Colors.red), const SizedBox(width: 4), const Text("Dolu", style: TextStyle(fontSize: 9, color: Colors.grey))]);
+  Widget _dot(Color c) => Container(width: 6, height: 6, decoration: BoxDecoration(color: c, shape: BoxShape.circle));
 
   Widget _takvimOlustur() {
     return SizedBox(height: 75, child: ListView.builder(scrollDirection: Axis.horizontal, itemCount: 14, itemBuilder: (c, i) {
@@ -243,35 +290,12 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
   Widget _altRezervasyonBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))],
-      ),
+      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))]),
       child: SafeArea(
         child: Row(
           children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text("Toplam", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                  Text("$toplamMaliyet TL", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4E342E))),
-                ],
-              ),
-            ),
-            Expanded(
-              flex: 2,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4E342E),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                onPressed: _randevuSureciniBaslat,
-                child: const Text("RANDEVU AL", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white, fontSize: 14)),
-              ),
-            ),
+            Expanded(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [const Text("Toplam", style: TextStyle(color: Colors.grey, fontSize: 10)), Text("$toplamMaliyet TL", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4E342E)))])),
+            Expanded(flex: 2, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4E342E), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), padding: const EdgeInsets.symmetric(vertical: 12)), onPressed: _randevuSureciniBaslat, child: const Text("RANDEVU AL", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white, fontSize: 14)))),
           ],
         ),
       ),
@@ -299,20 +323,11 @@ class _RandevuDetayEkraniState extends State<RandevuDetayEkrani> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen 05xx xxx xx xx formatında 11 haneli numaranızı girin.")));
       return;
     }
-    
     int sayi = await _dbService.aktifRandevuSayisi(t);
     if (sayi >= 1) { 
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Randevu Sınırı"),
-          content: const Text("Zaten aktif bir randevunuz bulunuyor. Yeni bir randevu almak için mevcut randevunuzun tamamlanması veya iptal edilmesi gerekmektedir."),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anladım"))],
-        ),
-      );
+      showDialog(context: context, builder: (context) => AlertDialog(title: const Text("Randevu Sınırı"), content: const Text("Zaten aktif bir randevunuz bulunuyor. Yeni bir randevu almak için mevcut randevunuzun tamamlanması veya iptal edilmesi gerekmektedir."), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anladım"))]));
       return; 
     }
-
     Navigator.push(context, MaterialPageRoute(builder: (c) => SmsOnayEkrani(isLogin: false, berberIsmi: widget.berber['isim'] ?? "", ustaIsmi: seciliUstaData!['isim'], tarih: DateFormat('dd.MM.yyyy').format(seciliTarih!), saat: seciliSaat!, musteriTelefon: t, userName: n, kisiTuru: "Yetişkin")));
   }
 
