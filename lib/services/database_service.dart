@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
 class DatabaseService {
@@ -7,8 +9,130 @@ class DatabaseService {
   DatabaseService._internal();
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // --- YORUM VE PUANLAMA SİSTEMİ (TRENDYOL STİLİ) ---
+  // --- KULLANICI PROFİL RESMİ YÜKLEME ---
+  Future<String?> profilResmiYukle(File file, String telefon) async {
+    try {
+      String fileName = "profile_${telefon}.jpg";
+      Reference ref = _storage.ref().child('users/$telefon/$fileName');
+      await ref.putFile(file);
+      String url = await ref.getDownloadURL();
+      
+      // Kullanıcıyı telefonla bul ve resmini güncelle
+      var snap = await _db.collection('users').where('telefon', isEqualTo: telefon.trim()).get();
+      if (snap.docs.isNotEmpty) {
+        await snap.docs.first.reference.update({'profilResmi': url});
+      }
+      return url;
+    } catch (e) {
+      debugPrint("Profil resmi yükleme hatası: $e");
+      return null;
+    }
+  }
+
+  // --- KULLANICI İŞLEMLERİ (İSİM ÖNCE GÖRÜNECEK ŞEKİLDE) ---
+  Future<void> kullaniciKaydet({
+    required String adSoyad, 
+    required String telefon, 
+    String? profilResmi,
+    String? dogumTarihi,
+    String? cinsiyet,
+    String? sehir,
+    String? email,
+    bool yeniKayit = false,
+  }) async {
+    final String cleanPhone = telefon.trim();
+    final String newDocId = "$adSoyad ($cleanPhone)";
+
+    // Önce bu telefona sahip eski bir döküman var mı kontrol et (ID değişmiş olabilir)
+    var existingDocs = await _db.collection('users').where('telefon', isEqualTo: cleanPhone).get();
+    
+    for (var doc in existingDocs.docs) {
+      if (doc.id != newDocId) {
+        await doc.reference.delete(); // Eski isimle kayıtlı dökümanı sil
+      }
+    }
+
+    Map<String, dynamic> data = {
+      'adSoyad': adSoyad,
+      'telefon': cleanPhone,
+      'sonGuncelleme': FieldValue.serverTimestamp(),
+    };
+    
+    if (yeniKayit) {
+      data['profilResmi'] = "";
+      data['dogumTarihi'] = "";
+      data['cinsiyet'] = "";
+      data['sehir'] = "";
+      data['email'] = "";
+      data['rol'] = 'musteri';
+      data['kayitTarihi'] = FieldValue.serverTimestamp();
+    } else {
+      if (profilResmi != null) data['profilResmi'] = profilResmi;
+      if (dogumTarihi != null) data['dogumTarihi'] = dogumTarihi;
+      if (cinsiyet != null) data['cinsiyet'] = cinsiyet;
+      if (sehir != null) data['sehir'] = sehir;
+      if (email != null) data['email'] = email;
+    }
+
+    await _db.collection('users').doc(newDocId).set(data, SetOptions(merge: true));
+  }
+
+  Future<Map<String, dynamic>?> kullaniciGetir(String t) async {
+    // ID değişebileceği için artık telefon alanı üzerinden sorgu yapıyoruz
+    var s = await _db.collection('users').where('telefon', isEqualTo: t.trim()).limit(1).get();
+    return s.docs.isNotEmpty ? s.docs.first.data() : null;
+  }
+
+  // --- RANDEVU İŞLEMLERİ ---
+  Future<void> randevuOlustur({required String musteriTelefon, required String berberIsmi, required String ustaIsmi, required String tarih, required String saat, required String kisiTuru, required String musteriAd}) async {
+    await _db.collection('randevular').add({
+      'musteriTelefon': musteriTelefon.trim(), 
+      'musteriAd': musteriAd, 
+      'berberIsmi': berberIsmi, 
+      'ustaIsmi': ustaIsmi, 
+      'tarih': tarih, 
+      'saat': saat, 
+      'kisiTuru': kisiTuru, 
+      'durum': 'aktif', 
+      'onayDurumu': 'bekliyor', 
+      'oylandi': 0, 
+      'olusturmaTarihi': FieldValue.serverTimestamp()
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> musterininRandevulariniGetir(String t) async {
+    var s = await _db.collection('randevular').where('musteriTelefon', isEqualTo: t.trim()).get();
+    var l = s.docs.map((d) => {...d.data(), 'id': d.id}).toList();
+    l.sort((a, b) => ((b['olusturmaTarihi'] as Timestamp?) ?? Timestamp.now()).compareTo((a['olusturmaTarihi'] as Timestamp?) ?? Timestamp.now()));
+    return l;
+  }
+
+  Future<int> aktifRandevuSayisi(String t) async {
+    var s = await _db.collection('randevular').where('musteriTelefon', isEqualTo: t.trim()).where('durum', isEqualTo: 'aktif').get();
+    return s.docs.length;
+  }
+
+  Stream<List<Map<String, dynamic>>> salonRandevulariniGetir(String s) {
+    return _db.collection('randevular').where('berberIsmi', isEqualTo: s).snapshots().map((sn) => sn.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+  }
+
+  // --- SALON İŞLEMLERİ ---
+  Stream<List<Map<String, dynamic>>> salonlariGetir(String sehir) {
+    return _db.collection('salonlar').snapshots().map((sn) => sn.docs.map((d) => {...d.data(), 'id': d.id}).where((s) => (s['sehir'] ?? "").toString().toLowerCase().contains(sehir.split(',')[0].toLowerCase().trim())).toList());
+  }
+
+  Future<Map<String, dynamic>?> salonGetirByEmail(String e) async {
+    var s = await _db.collection('salonlar').where('sahipEmail', isEqualTo: e).limit(1).get();
+    if (s.docs.isEmpty) return null;
+    var d = s.docs.first.data(); d['id'] = s.docs.first.id; return d;
+  }
+
+  Future<void> ustaEkle(String id, Map<String, dynamic> u) async { await _db.collection('salonlar').doc(id).update({'ustalar': FieldValue.arrayUnion([u])}); }
+  Future<void> hizmetEkle(String id, Map<String, dynamic> h) async { await _db.collection('salonlar').doc(id).update({'hizmetler': FieldValue.arrayUnion([h])}); }
+
+  // --- YORUM VE PUANLAMA SİSTEMİ ---
   Future<void> yorumKaydet({
     required String randevuId,
     required String ustaIsmi,
@@ -65,73 +189,37 @@ class DatabaseService {
     }
   }
 
-  // SIRALAMAYI BELLEKTE YAPIYORUZ (İndeks hatasını önlemek için)
   Stream<List<Map<String, dynamic>>> salonYorumlariniGetir(String salonIsmi) {
-    return _db.collection('yorumlar')
-        .where('salonIsmi', isEqualTo: salonIsmi)
-        .snapshots()
-        .map((sn) {
-          var list = sn.docs.map((d) => d.data()).toList();
-          list.sort((a, b) => ((b['tarih'] as Timestamp?) ?? Timestamp.now()).compareTo((a['tarih'] as Timestamp?) ?? Timestamp.now()));
-          return list;
-        });
+    return _db.collection('yorumlar').where('salonIsmi', isEqualTo: salonIsmi).snapshots().map((sn) {
+      var list = sn.docs.map((d) => d.data()).toList();
+      list.sort((a, b) => ((b['tarih'] as Timestamp?) ?? Timestamp.now()).compareTo((a['tarih'] as Timestamp?) ?? Timestamp.now()));
+      return list;
+    });
   }
 
   Stream<List<Map<String, dynamic>>> ustaYorumlariniGetir(String ustaIsmi) {
-    return _db.collection('yorumlar')
-        .where('ustaIsmi', isEqualTo: ustaIsmi)
-        .snapshots()
-        .map((sn) {
-          var list = sn.docs.map((d) => d.data()).toList();
-          list.sort((a, b) => ((b['tarih'] as Timestamp?) ?? Timestamp.now()).compareTo((a['tarih'] as Timestamp?) ?? Timestamp.now()));
-          return list;
-        });
+    return _db.collection('yorumlar').where('ustaIsmi', isEqualTo: ustaIsmi).snapshots().map((sn) {
+      var list = sn.docs.map((d) => d.data()).toList();
+      list.sort((a, b) => ((b['tarih'] as Timestamp?) ?? Timestamp.now()).compareTo((a['tarih'] as Timestamp?) ?? Timestamp.now()));
+      return list;
+    });
   }
 
-  // --- DİĞER METODLAR ---
-  Future<void> kullaniciKaydet({required String adSoyad, required String telefon, String? profilResmi}) async {
-    await _db.collection('users').doc("$adSoyad ($telefon)").set({'adSoyad': adSoyad, 'telefon': telefon.trim(), 'profilResmi': profilResmi ?? '', 'kayitTarihi': FieldValue.serverTimestamp(), 'rol': 'musteri'}, SetOptions(merge: true));
+  // --- GALERİ İŞLEMLERİ ---
+  Future<String?> fotografYukle(File file, String salonId) async {
+    try {
+      String fileName = "galeri_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      Reference ref = _storage.ref().child('salonlar/$salonId/galeri/$fileName');
+      UploadTask uploadTask = ref.putFile(file);
+      TaskSnapshot snapshot = await uploadTask;
+      String url = await snapshot.ref.getDownloadURL();
+      await _db.collection('salonlar').doc(salonId).update({'galeri': FieldValue.arrayUnion([url])});
+      return url;
+    } catch (e) { return null; }
   }
 
-  Future<Map<String, dynamic>?> kullaniciGetir(String t) async {
-    var s = await _db.collection('users').where('telefon', isEqualTo: t.trim()).limit(1).get();
-    return s.docs.isNotEmpty ? s.docs.first.data() : null;
+  Future<void> fotografSil(String salonId, String url) async {
+    await _db.collection('salonlar').doc(salonId).update({'galeri': FieldValue.arrayRemove([url])});
+    await _storage.refFromURL(url).delete();
   }
-
-  Future<void> randevuOlustur({required String musteriTelefon, required String berberIsmi, required String ustaIsmi, required String tarih, required String saat, required String kisiTuru, required String musteriAd}) async {
-    await _db.collection('randevular').add({'musteriTelefon': musteriTelefon.trim(), 'musteriAd': musteriAd, 'berberIsmi': berberIsmi, 'ustaIsmi': ustaIsmi, 'tarih': tarih, 'saat': saat, 'kisiTuru': kisiTuru, 'durum': 'aktif', 'onayDurumu': 'bekliyor', 'oylandi': 0, 'olusturmaTarihi': FieldValue.serverTimestamp()});
-  }
-
-  Future<List<Map<String, dynamic>>> musterininRandevulariniGetir(String t) async {
-    var s = await _db.collection('randevular').where('musteriTelefon', isEqualTo: t.trim()).get();
-    var l = s.docs.map((d) => {...d.data(), 'id': d.id}).toList();
-    l.sort((a, b) => ((b['olusturmaTarihi'] as Timestamp?) ?? Timestamp.now()).compareTo((a['olusturmaTarihi'] as Timestamp?) ?? Timestamp.now()));
-    return l;
-  }
-
-  Future<int> aktifRandevuSayisi(String t) async {
-    var s = await _db.collection('randevular').where('musteriTelefon', isEqualTo: t.trim()).where('durum', isEqualTo: 'aktif').get();
-    return s.docs.length;
-  }
-
-  Future<void> randevuyuTamamlaVeOyla(String id) async {
-    await _db.collection('randevular').doc(id).update({'durum': 'tamamlandi'});
-  }
-
-  Stream<List<Map<String, dynamic>>> salonRandevulariniGetir(String s) {
-    return _db.collection('randevular').where('berberIsmi', isEqualTo: s).snapshots().map((sn) => sn.docs.map((d) => {...d.data(), 'id': d.id}).toList());
-  }
-
-  Future<Map<String, dynamic>?> salonGetirByEmail(String e) async {
-    var s = await _db.collection('salonlar').where('sahipEmail', isEqualTo: e).limit(1).get();
-    if (s.docs.isEmpty) return null;
-    var d = s.docs.first.data(); d['id'] = s.docs.first.id; return d;
-  }
-
-  Stream<List<Map<String, dynamic>>> salonlariGetir(String sehir) {
-    return _db.collection('salonlar').snapshots().map((sn) => sn.docs.map((d) => {...d.data(), 'id': d.id}).where((s) => (s['sehir'] ?? "").toString().toLowerCase().contains(sehir.split(',')[0].toLowerCase().trim())).toList());
-  }
-
-  Future<void> ustaEkle(String id, Map<String, dynamic> u) async { await _db.collection('salonlar').doc(id).update({'ustalar': FieldValue.arrayUnion([u])}); }
-  Future<void> hizmetEkle(String id, Map<String, dynamic> h) async { await _db.collection('salonlar').doc(id).update({'hizmetler': FieldValue.arrayUnion([h])}); }
 }

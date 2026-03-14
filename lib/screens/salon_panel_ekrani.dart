@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/database_service.dart';
 import 'package:intl/intl.dart';
 
@@ -18,11 +20,12 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
   DateTime _seciliTarih = DateTime.now();
   bool _takvimAcik = false;
   late TabController _tabController;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this); // 5 Sekme (Galeri Eklendi)
     _tabController.addListener(() => setState(() {}));
     _salonBilgileriniGetir();
   }
@@ -43,6 +46,23 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
     }
   }
 
+  Future<void> _resimSecVeYukle() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (image != null) {
+      showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator()));
+      
+      String? url = await _db.fotografYukle(File(image.path), _salon!['id']);
+      
+      if (mounted) {
+        Navigator.pop(context);
+        if (url != null) {
+          _salonBilgileriniGetir();
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Fotoğraf başarıyla eklendi.")));
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_yukleniyor) return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -57,9 +77,10 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
           isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.analytics_rounded), text: "Analiz"),
+            Tab(icon: Icon(Icons.photo_library_rounded), text: "Galeri"), // YENİ
             Tab(icon: Icon(Icons.people_alt_rounded), text: "Müşteriler"),
-            Tab(icon: Icon(Icons.person_pin_rounded), text: "Usta Yönetimi"),
-            Tab(icon: Icon(Icons.content_cut_rounded), text: "Hizmet Listesi"),
+            Tab(icon: Icon(Icons.person_pin_rounded), text: "Ustalar"),
+            Tab(icon: Icon(Icons.content_cut_rounded), text: "Hizmetler"),
           ],
         ),
       ),
@@ -67,24 +88,55 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
         controller: _tabController,
         children: [
           _istatistikSekmesi(),
+          _galeriSekmesi(), // YENİ
           _musterilerSekmesi(),
           _ustalarSekmesi(),
           _hizmetlerSekmesi(),
         ],
       ),
-      floatingActionButton: (_tabController.index == 2 || _tabController.index == 3)
+      floatingActionButton: (_tabController.index == 1 || _tabController.index == 3 || _tabController.index == 4)
           ? FloatingActionButton.extended(
               backgroundColor: const Color(0xFF4E342E),
               foregroundColor: Colors.white,
-              elevation: 4,
-              onPressed: () => _eklemeDialogGoster(context),
-              label: Text(
-                _tabController.index == 2 ? "Usta Ekle" : "Hizmet Ekle",
-                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
-              ),
-              icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white),
+              onPressed: () {
+                if (_tabController.index == 1) _resimSecVeYukle();
+                else _eklemeDialogGoster(context);
+              },
+              label: Text(_tabController.index == 1 ? "Fotoğraf Ekle" : (_tabController.index == 3 ? "Usta Ekle" : "Hizmet Ekle")),
+              icon: const Icon(Icons.add),
             )
           : null,
+    );
+  }
+
+  Widget _galeriSekmesi() {
+    final List galeri = _salon!['galeri'] ?? [];
+    return Padding(
+      padding: const EdgeInsets.all(15.0),
+      child: galeri.isEmpty 
+      ? const Center(child: Text("Henüz fotoğraf eklenmemiş.\nSağ alttaki butondan ekleyebilirsiniz.", textAlign: TextAlign.center))
+      : GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10),
+          itemCount: galeri.length,
+          itemBuilder: (context, index) => Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(galeri[index], fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+              ),
+              Positioned(
+                top: 0, right: 0,
+                child: IconButton(
+                  icon: const CircleAvatar(backgroundColor: Colors.red, radius: 12, child: Icon(Icons.close, color: Colors.white, size: 14)),
+                  onPressed: () async {
+                    await _db.fotografSil(_salon!['id'], galeri[index]);
+                    _salonBilgileriniGetir();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
     );
   }
 
@@ -93,16 +145,11 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
       stream: _db.salonRandevulariniGetir(_salon!['isim']),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        
         final tumRandevular = snapshot.data!;
         final formatliSeciliTarih = DateFormat('dd.MM.yyyy').format(_seciliTarih);
         final gunlukRandevular = tumRandevular.where((r) => r['tarih'] == formatliSeciliTarih).toList();
-
         double gunlukCiro = 0;
-        for (var r in gunlukRandevular) {
-          gunlukCiro += (r['fiyat'] ?? 100).toDouble();
-        }
-
+        for (var r in gunlukRandevular) gunlukCiro += (r['fiyat'] ?? 100).toDouble();
         Map<String, int> ustaRandevuSayisi = {};
         Map<String, double> ustaKazanci = {};
         for (var r in gunlukRandevular) {
@@ -110,7 +157,6 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
           ustaRandevuSayisi[usta] = (ustaRandevuSayisi[usta] ?? 0) + 1;
           ustaKazanci[usta] = (ustaKazanci[usta] ?? 0) + (r['fiyat'] ?? 100).toDouble();
         }
-
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -327,7 +373,7 @@ class _SalonPanelEkraniState extends State<SalonPanelEkrani> with SingleTickerPr
   }
 
   void _eklemeDialogGoster(BuildContext context) {
-    final isUstaSecili = _tabController.index == 2;
+    final isUstaSecili = _tabController.index == 3;
     final controller1 = TextEditingController();
     final controller2 = TextEditingController();
 

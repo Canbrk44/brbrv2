@@ -46,15 +46,13 @@ class _SmsOnayEkraniState extends State<SmsOnayEkrani> {
       return;
     }
 
-    // Gerçek bir SMS doğrulaması simülasyonu için 1234 kodunu kabul edelim (Test amaçlı)
-    // if (_codeController.text != "1234") { ... }
-
     if (widget.isLogin) {
       if (widget.userName != null && widget.musteriTelefon != null) {
-        // Kullanıcıyı 'users' koleksiyonuna kaydet (veya güncelle)
+        // İLK KAYIT/GİRİŞ: Şablonu boş alanlarla oluştur (yeniKayit: true)
         await _dbService.kullaniciKaydet(
           adSoyad: widget.userName!,
           telefon: widget.musteriTelefon!,
+          yeniKayit: true, 
         );
 
         final prefs = await SharedPreferences.getInstance();

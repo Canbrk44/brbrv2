@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'screens/giris_ekrani.dart';
 import 'screens/ana_sayfa.dart';
+import 'screens/salon_panel_ekrani.dart'; // Eklendi
 import 'firebase_options.dart';
 
 void main() async {
@@ -18,14 +19,23 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final String? phone = prefs.getString('user_phone');
   final String? name = prefs.getString('user_name');
+  final String? ownerEmail = prefs.getString('owner_email'); // Salon sahibi kontrolü
 
   _konumIzniIste();
 
-  runApp(BerberApp(
-    initialScreen: (phone != null && name != null)
-        ? AnaSayfa(phoneNumber: phone, userName: name, isGuest: false)
-        : const GirisEkrani(),
-  ));
+  Widget initialScreen;
+  if (ownerEmail != null) {
+    // Eğer salon sahibi girişi varsa direkt panele git
+    initialScreen = SalonPanelEkrani(ownerEmail: ownerEmail);
+  } else if (phone != null && name != null) {
+    // Normal kullanıcı girişi
+    initialScreen = AnaSayfa(phoneNumber: phone, userName: name, isGuest: false);
+  } else {
+    // Giriş yapılmamış
+    initialScreen = const GirisEkrani();
+  }
+
+  runApp(BerberApp(initialScreen: initialScreen));
 }
 
 void _konumIzniIste() async {
@@ -60,10 +70,8 @@ class BerberApp extends StatelessWidget {
           primary: const Color(0xFF4E342E),
           secondary: const Color(0xFF8D6E63),
           surface: Colors.white,
-          // Modern "Cool Gray" Arka Plan
           background: const Color(0xFFF5F7F8),
         ),
-        // Global Arka Plan Rengi
         scaffoldBackgroundColor: const Color(0xFFF5F7F8),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,

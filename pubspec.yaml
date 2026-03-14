@@ -24,6 +24,8 @@ dependencies:
   firebase_core: ^2.32.0
   cloud_firestore: ^4.17.5
   firebase_auth: ^4.17.9
+  firebase_storage: ^11.6.0 # Yeni eklendi
+  image_picker: ^1.0.7 # Yeni eklendi
 
 dev_dependencies:
   flutter_test:
