@@ -1,12 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/database_service.dart';
-import 'sms_onay_ekrani.dart';
 import 'giris_ekrani.dart';
-import 'ana_sayfa.dart';
-import 'profil_duzenle_ekrani.dart';
+import 'profil_duzenle_ekrani.dart'; // DOĞRU DOSYA İSMİ
 
 class ProfilEkrani extends StatefulWidget {
   final bool isGuest;
@@ -21,182 +19,177 @@ class ProfilEkrani extends StatefulWidget {
 
 class _ProfilEkraniState extends State<ProfilEkrani> {
   final DatabaseService _db = DatabaseService();
-  String? _currentName;
-  String? _profilePic;
+  final ImagePicker _picker = ImagePicker();
+  Map<String, dynamic>? _user;
+  bool _yukleniyor = true;
 
   @override
   void initState() {
     super.initState();
-    _currentName = widget.userName;
-    _userDataGetir();
+    if (!widget.isGuest) _kullaniciYukle();
+    else setState(() => _yukleniyor = false);
   }
 
-  Future<void> _userDataGetir() async {
-    if (widget.phoneNumber != null) {
-      final data = await _db.kullaniciGetir(widget.phoneNumber!);
-      if (data != null && mounted) {
-        setState(() {
-          _currentName = data['adSoyad'];
-          _profilePic = data['profilResmi'];
-        });
-      }
+  Future<void> _kullaniciYukle() async {
+    final data = await _db.kullaniciGetir(widget.phoneNumber!);
+    if (mounted) setState(() { _user = data; _yukleniyor = false; });
+  }
+
+  Future<void> _resimDegistir() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
+    if (image != null) {
+      String? url = await _db.profilResmiYukle(File(image.path), widget.phoneNumber!);
+      if (url != null) _kullaniciYukle();
     }
+  }
+
+  Future<void> _cikisYap() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const GirisEkrani()), (r) => false);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_yukleniyor) return const Center(child: CircularProgressIndicator(color: Color(0xFFFF9800)));
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5),
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 220.0,
-            pinned: true,
-            stretch: true,
-            backgroundColor: const Color(0xFF4E342E),
-            flexibleSpace: FlexibleSpaceBar(
-              title: const Text("Profilim", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18, shadows: [Shadow(color: Colors.black45, blurRadius: 10)])),
-              background: Stack(
-                fit: StackFit.expand,
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: const Text("Profilim", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(25),
+        child: Column(
+          children: [
+            _profilKarti(),
+            const SizedBox(height: 30),
+            _ayarlarBolumu(),
+            const SizedBox(height: 40),
+            _cikisButonu(),
+            const SizedBox(height: 100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _profilKarti() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161925),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.white.withOpacity(0.05),
+                backgroundImage: _user?['profilResmi'] != null && _user?['profilResmi'].isNotEmpty 
+                  ? NetworkImage(_user!['profilResmi']) 
+                  : const NetworkImage("https://i.pravatar.cc/300"),
+              ),
+              if (!widget.isGuest)
+                GestureDetector(
+                  onTap: _resimDegistir,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(color: Color(0xFFFF9800), shape: BoxShape.circle),
+                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(widget.userName ?? "Misafir Kullanıcı", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 5),
+          Text(widget.phoneNumber ?? "Giriş yapılmadı", style: const TextStyle(color: Colors.white38, fontSize: 13)),
+          if (!widget.isGuest) ...[
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.network('https://images.pexels.com/photos/3992870/pexels-photo-3992870.jpeg', fit: BoxFit.cover),
-                  const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black87]))),
+                  Icon(Icons.verified, color: Colors.green, size: 14),
+                  SizedBox(width: 6),
+                  const Text("Onaylı Üye", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
                 ],
               ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: widget.isGuest ? _ziyaretciGorunumu(context) : _profilGorunumu(context),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _ziyaretciGorunumu(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(30.0),
-      child: Column(
-        children: [
-          const SizedBox(height: 50),
-          Icon(Icons.account_circle_outlined, size: 100, color: Colors.grey[300]),
-          const SizedBox(height: 20),
-          const Text("Profilinizi yönetmek için giriş yapın", textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 30),
-          ElevatedButton(onPressed: () => _girisPopupGoster(context), child: const Text("GİRİŞ YAP / KAYIT OL")),
-        ],
-      ),
+  Widget _ayarlarBolumu() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("AYARLAR", style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        const SizedBox(height: 15),
+        _ayarSatiri("Kişisel Bilgiler", Icons.person_outline, () async {
+          if (widget.isGuest) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen önce giriş yapın.")));
+            return;
+          }
+          // DOĞRU EKRAN ÇAĞRISI
+          bool? guncellendi = await Navigator.push(
+            context, 
+            MaterialPageRoute(builder: (c) => ProfilDuzenleEkrani(
+              currentName: widget.userName ?? "", 
+              phoneNumber: widget.phoneNumber!,
+              profilePic: _user?['profilResmi'],
+            ))
+          );
+          if (guncellendi == true) _kullaniciYukle();
+        }),
+        _ayarSatiri("Bildirim Ayarları", Icons.notifications_none, () {}),
+        _ayarSatiri("Uygulama Teması", Icons.palette_outlined, () {}),
+        _ayarSatiri("Hakkımızda", Icons.info_outline, () {}),
+        _ayarSatiri("Yardım & Destek", Icons.help_outline, () {}),
+      ],
     );
   }
 
-  Widget _profilGorunumu(BuildContext context) {
-    final primaryColor = const Color(0xFF4E342E);
-    return Padding(
-      padding: const EdgeInsets.all(25.0),
-      child: Column(
-        children: [
-          Center(
-            child: CircleAvatar(
-              radius: 55, 
-              backgroundColor: primaryColor.withOpacity(0.1), 
-              backgroundImage: (_profilePic != null && _profilePic!.isNotEmpty) ? NetworkImage(_profilePic!) : null,
-              child: (_profilePic == null || _profilePic!.isEmpty) ? Icon(Icons.person, size: 60, color: primaryColor) : null,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(_currentName ?? "Kullanıcı", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          Text(widget.phoneNumber ?? "", style: TextStyle(color: Colors.grey[600])),
-          const SizedBox(height: 40),
-          
-          _profilMenusu(Icons.person_outline, "Bilgilerimi Düzenle", () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ProfilDuzenleEkrani(
-                  currentName: _currentName ?? "",
-                  phoneNumber: widget.phoneNumber!,
-                  profilePic: _profilePic,
-                ),
-              ),
-            );
-            if (result == true) {
-              _userDataGetir();
-            }
-          }),
-          
-          _profilMenusu(Icons.calendar_month_outlined, "Randevularım", () {
-            Navigator.pushAndRemoveUntil(
-              context, 
-              MaterialPageRoute(builder: (context) => AnaSayfa(phoneNumber: widget.phoneNumber, userName: _currentName, initialIndex: 2)),
-              (route) => false,
-            );
-          }),
-          
-          _profilMenusu(Icons.notifications_none_outlined, "Bildirim Ayarları", () {
-            showDialog(context: context, builder: (c) => AlertDialog(title: const Text("Bildirimler"), content: const Text("Bildirim ayarlarınızı telefonunuzun ayarlar kısmından yönetebilirsiniz."), actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text("Anladım"))]));
-          }),
-          
-          _profilMenusu(Icons.help_outline, "Yardım ve Destek", () async {
-            final Uri url = Uri.parse("https://wa.me/905320000000");
-            if (await canLaunchUrl(url)) {
-              await launchUrl(url, mode: LaunchMode.externalApplication);
-            }
-          }),
-          
-          const SizedBox(height: 20),
-          _profilMenusu(Icons.logout, "Çıkış Yap", () => _cikisOnayDialog(context), renk: Colors.red),
-          const SizedBox(height: 100),
-        ],
-      ),
-    );
-  }
-
-  void _cikisOnayDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Çıkış Yap"),
-        content: const Text("Hesabınızdan çıkış yapmak istediğinize emin misiniz?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Vazgeç", style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _cikisYap(context);
-            },
-            child: const Text("Evet, Çıkış Yap", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _cikisYap(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const GirisEkrani()), (route) => false);
-  }
-
-  void _girisPopupGoster(BuildContext context) {
-    final nC = TextEditingController(); final pC = TextEditingController();
-    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (context) => Container(padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom), decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))), child: Padding(padding: const EdgeInsets.all(30.0), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))), const SizedBox(height: 25), const Text("Giriş Yap / Kayıt Ol", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 30), TextField(controller: nC, decoration: const InputDecoration(prefixIcon: Icon(Icons.person_outline), hintText: "Adınız Soyadınız")), const SizedBox(height: 15), TextField(controller: pC, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)], decoration: const InputDecoration(prefixIcon: Icon(Icons.phone_outlined), hintText: "05xx xxx xx xx")), const SizedBox(height: 30), ElevatedButton(onPressed: () { if (nC.text.isNotEmpty && pC.text.length == 11) { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (context) => SmsOnayEkrani(isLogin: true, userName: nC.text, musteriTelefon: pC.text, berberIsmi: "", ustaIsmi: "", tarih: "", saat: ""))); } }, child: const Text("SMS DOĞRULAMASINA GEÇ")), const SizedBox(height: 15)]))));
-  }
-
-  Widget _profilMenusu(IconData ikon, String baslik, VoidCallback onTap, {Color? renk}) {
+  Widget _ayarSatiri(String baslik, IconData icon, VoidCallback onTap) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
+      decoration: BoxDecoration(color: const Color(0xFF161925), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.05))),
       child: ListTile(
-        leading: Icon(ikon, color: renk ?? Colors.black87),
-        title: Text(baslik, style: TextStyle(color: renk ?? Colors.black87, fontWeight: FontWeight.w500)),
-        trailing: const Icon(Icons.chevron_right, size: 20),
+        leading: Icon(icon, color: const Color(0xFFFF9800), size: 22),
+        title: Text(baslik, style: const TextStyle(color: Colors.white, fontSize: 15)),
+        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white10, size: 14),
         onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _cikisButonu() {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.red.withOpacity(0.1),
+        foregroundColor: Colors.red,
+        side: BorderSide(color: Colors.red.withOpacity(0.3)),
+        elevation: 0,
+      ),
+      onPressed: _cikisYap,
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.logout_rounded, size: 18),
+          SizedBox(width: 10),
+          Text("Hesaptan Çıkış Yap", style: TextStyle(fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
